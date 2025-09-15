@@ -1,0 +1,22 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug Rust program",
+            "program": "${workspaceFolder}/target/debug/arith-compiler",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "cargo": {
+                "args": ["build"],
+                "filter": {
+                    "name": "arith-compiler",
+                    "kind": "bin"
+                }
+            },
+            "sourceLanguages": ["rust"]
+        }
+    ]
+}
