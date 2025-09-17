@@ -40,6 +40,7 @@ pub struct Token {
 
 
 // ast schemas
+#[derive(PartialEq, Clone)]
 pub enum BinOpKind {
     Add,
     Sub,
@@ -47,7 +48,7 @@ pub enum BinOpKind {
     Div,
 }
 
-
+#[derive(PartialEq, Clone)]
 pub enum Expr {
     Literal(Literal),
     Identifier(String),
@@ -58,7 +59,9 @@ pub enum Expr {
     },
 }
 
+#[derive(PartialEq, Clone)]
 pub enum Stmt {
     Declare { dtype: Primitive, name: String, expr: Expr },
     Print { expr: Expr },
+    EOF
 }

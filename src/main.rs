@@ -1,6 +1,6 @@
 mod schemas;
 mod lexer;
-mod ast;
+mod parser;
 
 use crate::lexer::*;
 
