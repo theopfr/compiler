@@ -3,7 +3,6 @@ use crate::schemas::*;
 pub struct Ast {
     tokens: Vec<Token>,
     cur_pos: usize,
-    tree: Vec<Stmt>,
 }
 
 impl Ast {
@@ -11,40 +10,67 @@ impl Ast {
         Ast {
             tokens: tokens,
             cur_pos: 0,
-            tree: vec![],
         }
     }
 
-    fn parse_expression(&self, tokens: &[Token], pos: usize) -> Expr {
-        let cur_token = &tokens[pos];
-        match &cur_token.kind {
-            TokenKind::Identifier(_) => todo!(),
-            TokenKind::Literal(literal) => todo!(),
-            TokenKind::Add => todo!(),
-            TokenKind::Sub => todo!(),
-            TokenKind::Mult => todo!(),
-            TokenKind::Div => todo!(),
-            TokenKind::LParen => todo!(),
-            TokenKind::RParen => todo!(),
-            _ => panic!("Unexpected token {:?}.", cur_token),
-        }
+    fn peek_next(&mut self) -> &Token {
+        return &self.tokens[self.cur_pos];
     }
 
-    fn parse_until_eos(&mut self) -> Expr {
-        let start = self.cur_pos;
+    fn consume_next(&mut self) -> &Token {
+        let token = &self.tokens[self.cur_pos];
+        self.cur_pos += 1;
+        token
+    }
 
-        while !matches!(self.tokens[self.cur_pos].kind, TokenKind::EOS | TokenKind::EOF) {
-            self.cur_pos += 1;
+    fn parse_expression(&mut self, min_binding_pow: f32) -> Expr {
+        let mut lhs = match &self.consume_next().kind {
+            TokenKind::Literal(literal) => Expr::Literal(literal.clone()),
+            TokenKind::Identifier(name) => Expr::Identifier(name.to_string()),
+            TokenKind::BinOp(BinOpKind::Sub) => Expr::BinOp {
+                op: BinOpKind::Sub,
+                left: Box::new(Expr::Literal(Literal::Int("0".to_string()))),
+                right: Box::new(self.parse_expression(3.0)),
+            },
+
+            TokenKind::BinOp(BinOpKind::Add) => self.parse_expression(3.0),
+            t => panic!("Unexpected token {:?}.", t),
+        };
+
+        loop {
+            let next_op = self.peek_next();
+
+            match &next_op.kind {
+                TokenKind::BinOp(op) => {
+                    let (lbp, rbp) = Self::airthmetic_binding_power(&op);
+                    if lbp < min_binding_pow {
+                        break;
+                    }
+
+                    let op_clone = op.clone();
+                    let _ = self.consume_next();
+
+                    lhs = Expr::BinOp {
+                        op: op_clone,
+                        left: Box::new(lhs),
+                        right: Box::new(self.parse_expression(rbp.clone())),
+                    };
+                }
+                TokenKind::EOS => break,
+                TokenKind::EOF => break,
+                t => panic!("Unexpected token {:?}.", t),
+            };
         }
 
-        let expr_tokens = &self.tokens[start..self.cur_pos];
+        lhs
+    }
 
-        // consume the semicolon
-        if matches!(self.tokens[self.cur_pos].kind, TokenKind::EOS) {
-            self.cur_pos += 1;
+    fn airthmetic_binding_power(op: &BinOpKind) -> (f32, f32) {
+        match op {
+            BinOpKind::Add | BinOpKind::Sub => (1.1, 1.2),
+            BinOpKind::Mult | BinOpKind::Div => (2.1, 2.2),
+            _ => panic!("Unknown operation: {:?}", op),
         }
-
-        self.parse_expression(expr_tokens, self.cur_pos.clone())
     }
 
     fn parse_statement(&mut self) -> Stmt {
@@ -66,37 +92,30 @@ impl Ast {
                     return Stmt::Declare {
                         dtype: data_type,
                         name: name.clone(),
-                        expr: self.parse_until_eos(),
+                        expr: self.parse_expression(0.0),
                     };
-                }
-                else {
+                } else {
                     panic!("Expected identifier.");
                 }
             }
-            TokenKind::Identifier(_) => todo!(),
-            TokenKind::Literal(literal) => todo!(),
-            TokenKind::Assign => todo!(),
-            TokenKind::Add => todo!(),
-            TokenKind::Sub => todo!(),
-            TokenKind::Mult => todo!(),
-            TokenKind::Div => todo!(),
-            TokenKind::LParen => todo!(),
-            TokenKind::RParen => todo!(),
-            TokenKind::Print => todo!(),
-            TokenKind::EOS => todo!(),
-            TokenKind::EOF => return Stmt::EOF,
+            TokenKind::EOS => Stmt::EOS,
+            TokenKind::EOF => Stmt::EOF,
+            _ => todo!(),
         }
     }
 
-    pub fn parse(mut self) {
-        loop {
-            let statement = self.parse_statement();
+    pub fn parse(mut self) -> Vec<Stmt> {
+        let mut tree = Vec::new();
 
-            if statement == Stmt::EOF {
-                return;
+        while !matches!(self.peek_next().kind, TokenKind::EOF) {
+            let stmt = self.parse_statement();
+            tree.push(stmt);
+
+            if matches!(self.peek_next().kind, TokenKind::EOS) {
+                self.consume_next();
             }
-
-            self.tree.push(statement.clone());
         }
+
+        tree
     }
 }

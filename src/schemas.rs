@@ -21,10 +21,7 @@ pub enum TokenKind {
     Identifier(String),
     Literal(Literal),
     Assign,
-    Add,
-    Sub,
-    Mult,
-    Div,
+    BinOp(BinOpKind),
     LParen,
     RParen,
     Print,
@@ -32,7 +29,7 @@ pub enum TokenKind {
     EOF,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Token {
     pub kind: TokenKind,
     pub pos: usize,
@@ -40,7 +37,7 @@ pub struct Token {
 
 
 // ast schemas
-#[derive(PartialEq, Clone)]
+#[derive(PartialEq, Clone, Debug)]
 pub enum BinOpKind {
     Add,
     Sub,
@@ -48,7 +45,7 @@ pub enum BinOpKind {
     Div,
 }
 
-#[derive(PartialEq, Clone)]
+#[derive(PartialEq, Clone, Debug)]
 pub enum Expr {
     Literal(Literal),
     Identifier(String),
@@ -59,9 +56,10 @@ pub enum Expr {
     },
 }
 
-#[derive(PartialEq, Clone)]
+#[derive(PartialEq, Clone, Debug)]
 pub enum Stmt {
     Declare { dtype: Primitive, name: String, expr: Expr },
     Print { expr: Expr },
-    EOF
+    EOF,
+    EOS
 }
