@@ -95,7 +95,7 @@ impl Lexer {
         panic!("Unterminated string at position {start}.");
     }
 
-    pub fn tokenize(&mut self) -> &Vec<Token> {
+    pub fn tokenize(&mut self) {
         loop {
             let cur_char = self.chars[self.cur_pos];
 
@@ -162,9 +162,11 @@ impl Lexer {
 
             self.cur_pos += 1;
         }
-
-        return &self.tokens;
     }
+
+    pub fn get_tokens(&self) -> &Vec<Token> {
+        &self.tokens
+    } 
 }
 
 
@@ -174,7 +176,8 @@ mod tests {
 
     fn lex(input: &str) -> Vec<TokenKind> {
         let mut lexer = Lexer::new(&(input.to_owned() + "\0"));
-        lexer.tokenize().iter().map(|t| t.kind.clone()).collect()
+        lexer.tokenize();
+        lexer.get_tokens().iter().map(|t| t.kind.clone()).collect()
     }
 
     #[test]

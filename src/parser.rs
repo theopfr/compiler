@@ -1,8 +1,11 @@
+use std::{f32::INFINITY};
+
 use crate::schemas::*;
 
 pub struct Ast {
     tokens: Vec<Token>,
     cur_pos: usize,
+    tree: Vec<Stmt>,
 }
 
 impl Ast {
@@ -10,10 +13,11 @@ impl Ast {
         Ast {
             tokens: tokens,
             cur_pos: 0,
+            tree: vec![],
         }
     }
 
-    fn peek_next(&mut self) -> &Token {
+    fn peek_next(&self) -> &Token {
         return &self.tokens[self.cur_pos];
     }
 
@@ -30,10 +34,17 @@ impl Ast {
             TokenKind::BinOp(BinOpKind::Sub) => Expr::BinOp {
                 op: BinOpKind::Sub,
                 left: Box::new(Expr::Literal(Literal::Int("0".to_string()))),
-                right: Box::new(self.parse_expression(3.0)),
+                right: Box::new(self.parse_expression(INFINITY)),
             },
-
-            TokenKind::BinOp(BinOpKind::Add) => self.parse_expression(3.0),
+            TokenKind::BinOp(BinOpKind::Add) => self.parse_expression(INFINITY),
+            TokenKind::LParen => {
+                let expr = self.parse_expression(0.0);
+                if !matches!(self.peek_next().kind, TokenKind::RParen) {
+                    panic!("Expected ')'.");
+                }
+                self.consume_next();
+                expr
+            }
             t => panic!("Unexpected token {:?}.", t),
         };
 
@@ -58,6 +69,7 @@ impl Ast {
                 }
                 TokenKind::EOS => break,
                 TokenKind::EOF => break,
+                TokenKind::RParen => break,
                 t => panic!("Unexpected token {:?}.", t),
             };
         }
@@ -69,53 +81,164 @@ impl Ast {
         match op {
             BinOpKind::Add | BinOpKind::Sub => (1.1, 1.2),
             BinOpKind::Mult | BinOpKind::Div => (2.1, 2.2),
-            _ => panic!("Unknown operation: {:?}", op),
         }
     }
 
     fn parse_statement(&mut self) -> Stmt {
-        let cur_token = &self.tokens[self.cur_pos];
+        match self.consume_next().clone().kind {
+            TokenKind::Declare(ref primitive) => {
+                // Check for identifier (ie. variable name)
+                let identifer_name = match self.peek_next().clone().kind {
+                    TokenKind::Identifier(name) => name,
+                    t => panic!("Unexpected token {:?}.", t),
+                };
+                self.consume_next();
 
-        match &cur_token.kind {
-            TokenKind::Declare(primitive) => {
-                let data_type = primitive.clone();
-                self.cur_pos += 1;
+                // Check for assign token (ie. '=')
+                if !matches!(self.peek_next().kind, TokenKind::Assign) {
+                    panic!("Expected '=' after declaration.");
+                }
+                self.consume_next();
 
-                if let TokenKind::Identifier(name) = &self.tokens[self.cur_pos].kind {
-                    self.cur_pos += 1;
-
-                    if !matches!(self.tokens[self.cur_pos].kind, TokenKind::Assign) {
-                        panic!("Expected '=' after declaration.");
-                    }
-                    self.cur_pos += 1;
-
-                    return Stmt::Declare {
-                        dtype: data_type,
-                        name: name.clone(),
-                        expr: self.parse_expression(0.0),
-                    };
-                } else {
-                    panic!("Expected identifier.");
+                Stmt::Declare {
+                    dtype: primitive.clone(),
+                    name: identifer_name.clone(),
+                    expr: self.parse_expression(0.0),
                 }
             }
-            TokenKind::EOS => Stmt::EOS,
-            TokenKind::EOF => Stmt::EOF,
             _ => todo!(),
         }
     }
 
-    pub fn parse(mut self) -> Vec<Stmt> {
-        let mut tree = Vec::new();
-
+    pub fn parse(&mut self) {
         while !matches!(self.peek_next().kind, TokenKind::EOF) {
             let stmt = self.parse_statement();
-            tree.push(stmt);
+            self.tree.push(stmt);
 
             if matches!(self.peek_next().kind, TokenKind::EOS) {
                 self.consume_next();
             }
         }
+    }
 
-        tree
+    pub fn get_tree(&self) -> &Vec<Stmt> {
+        &self.tree
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::lexer::Lexer;
+
+    fn parse(input: &str) -> Vec<Stmt> {
+        let mut lexer = Lexer::new(&(input.to_owned() + "\0"));
+        lexer.tokenize();
+
+        let mut parser = Ast::new(lexer.get_tokens().to_vec());
+        parser.parse();
+
+        parser.get_tree().to_vec()
+    }
+
+    #[test]
+    fn test_simple_statement() {
+        let ast = parse("int a = 1 + 2;");
+        assert_eq!(
+            ast,
+            [Stmt::Declare {
+                dtype: Primitive::Int,
+                name: "a".to_string(),
+                expr: Expr::BinOp {
+                    op: BinOpKind::Add,
+                    left: Box::new(Expr::Literal(Literal::Int("1".to_string()))),
+                    right: Box::new(Expr::Literal(Literal::Int("2".to_string())))
+                }
+            }]
+        );
+    }
+
+    #[test]
+    fn test_left_side_precedence() {
+        let ast = parse("float a = 1 * 2 + 3;");
+        assert_eq!(
+            ast,
+            [Stmt::Declare {
+                dtype: Primitive::Float,
+                name: "a".to_string(),
+                expr: Expr::BinOp {
+                    op: BinOpKind::Add,
+                    left: Box::new(Expr::BinOp {
+                        op: BinOpKind::Mult,
+                        left: Box::new(Expr::Literal(Literal::Int("1".to_string()))),
+                        right: Box::new(Expr::Literal(Literal::Int("2".to_string())))
+                    }),
+                    right: Box::new(Expr::Literal(Literal::Int("3".to_string())))
+                }
+            }]
+        );
+    }
+
+    #[test]
+    fn test_right_side_precedence() {
+        let ast = parse("float a = 1 - 2 / 3;");
+        assert_eq!(
+            ast,
+            [Stmt::Declare {
+                dtype: Primitive::Float,
+                name: "a".to_string(),
+                expr: Expr::BinOp {
+                    op: BinOpKind::Sub,
+                    left: Box::new(Expr::Literal(Literal::Int("1".to_string()))),
+                    right: Box::new(Expr::BinOp {
+                        op: BinOpKind::Div,
+                        left: Box::new(Expr::Literal(Literal::Int("2".to_string()))),
+                        right: Box::new(Expr::Literal(Literal::Int("3".to_string())))
+                    }),
+                }
+            }]
+        );
+    }
+
+    #[test]
+    fn test_unary_operator() {
+        let ast = parse("int res = -b * +3;");
+        assert_eq!(
+            ast,
+            [Stmt::Declare {
+                dtype: Primitive::Int,
+                name: "res".to_string(),
+                expr: Expr::BinOp {
+                    op: BinOpKind::Mult,
+                    left: Box::new(Expr::BinOp {
+                        op: BinOpKind::Sub,
+                        left: Box::new(Expr::Literal(Literal::Int("0".to_string()))),
+                        right: Box::new(Expr::Identifier("b".to_string()))
+                    }),
+                    right: Box::new(Expr::Literal(Literal::Int("3".to_string()))),
+                }
+            }]
+        );
+    }
+
+    #[test]
+    fn test_simple_parentheses() {
+        let ast = parse("int c = (1 + 2) * 3;");
+        assert_eq!(
+            ast,
+            [Stmt::Declare {
+                dtype: Primitive::Int,
+                name: "c".to_string(),
+                expr: Expr::BinOp {
+                    op: BinOpKind::Mult,
+                    left: Box::new(Expr::BinOp {
+                        op: BinOpKind::Add,
+                        left: Box::new(Expr::Literal(Literal::Int("1".to_string()))),
+                        right: Box::new(Expr::Literal(Literal::Int("2".to_string()))),
+                    }),
+                    right: Box::new(Expr::Literal(Literal::Int("3".to_string()))),
+                }
+            }]
+        );
     }
 }
