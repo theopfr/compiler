@@ -7,6 +7,12 @@ pub enum Primitive {
     Str,
 }
 
+pub struct Identifier {
+    pub name: String,
+    pub primitive: Primitive
+}
+
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum Literal {
     Int(String),
@@ -63,3 +69,13 @@ pub enum Stmt {
     EOF,
     EOS
 }
+
+
+pub enum ContextType {
+    Int,
+    Float,
+    Str,
+    Auto
+}
+
+pub type Ast = Vec<Stmt>;

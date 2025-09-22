@@ -1,30 +1,31 @@
-use std::{f32::INFINITY};
+use std::f32::INFINITY;
 
 use crate::schemas::*;
 
-pub struct Ast {
+pub struct Parser {
     tokens: Vec<Token>,
-    cur_pos: usize,
-    tree: Vec<Stmt>,
+    tree: Ast,
 }
 
-impl Ast {
-    pub fn new(tokens: Vec<Token>) -> Self {
-        Ast {
+impl Parser {
+    pub fn new(mut tokens: Vec<Token>) -> Self {
+        tokens.reverse();
+
+        Parser {
             tokens: tokens,
-            cur_pos: 0,
             tree: vec![],
         }
     }
 
-    fn peek_next(&self) -> &Token {
-        return &self.tokens[self.cur_pos];
+    fn peek_next(&self) -> Token {
+        self.tokens
+            .last()
+            .cloned()
+            .unwrap_or(Token { kind: TokenKind::EOF, pos: self.tokens.len() })
     }
-
-    fn consume_next(&mut self) -> &Token {
-        let token = &self.tokens[self.cur_pos];
-        self.cur_pos += 1;
-        token
+    
+    fn consume_next(&mut self) -> Token {
+        self.tokens.pop().unwrap_or(Token { kind: TokenKind::EOF, pos: self.tokens.len() })
     }
 
     fn parse_expression(&mut self, min_binding_pow: f32) -> Expr {
@@ -106,13 +107,30 @@ impl Ast {
                     expr: self.parse_expression(0.0),
                 }
             }
-            _ => todo!(),
+            TokenKind::Print => {
+                if !matches!(self.peek_next().kind, TokenKind::LParen) {
+                    panic!("Expected '(' after 'print' keyword.");
+                }
+                self.consume_next();
+                let expr = self.parse_expression(0.0);
+                if !matches!(self.peek_next().kind, TokenKind::RParen) {
+                    panic!("Expected ')'.");
+                }
+                self.consume_next();
+
+                Stmt::Print { expr: expr }
+            }
+            k => panic!("Unexpected token kind {:?}.", k),
         }
     }
 
     pub fn parse(&mut self) {
         while !matches!(self.peek_next().kind, TokenKind::EOF) {
             let stmt = self.parse_statement();
+            if !matches!(self.peek_next().kind, TokenKind::EOS) {
+                panic!("Expected ';' at end of expression.");
+            }
+
             self.tree.push(stmt);
 
             if matches!(self.peek_next().kind, TokenKind::EOS) {
@@ -121,7 +139,40 @@ impl Ast {
         }
     }
 
-    pub fn get_tree(&self) -> &Vec<Stmt> {
+    fn type_check_expr(&self, expr: &Expr, ctx_type: &Primitive, identifiers: &Vec<Identifier>) {
+        match expr {
+            Expr::Literal(literal) => {
+                
+            },
+            Expr::Identifier(name) => {
+
+            },
+            Expr::BinOp { op: _, left, right } => {
+                self.type_check_expr(left, &ctx_type, &identifiers);
+                self.type_check_expr(right, &ctx_type, &identifiers);
+            },
+        }
+    }
+
+    pub fn type_check(&self) {
+        let mut identifiers: Vec<Identifier> = vec![];
+
+        for stmt in &self.tree {
+            let mut cur_ctx_type = Primitive::Int;
+
+            match stmt {
+                Stmt::Declare { dtype, name, expr } => {
+                    cur_ctx_type = dtype.clone();
+                    identifiers.push(Identifier { name: name.to_string(), primitive: cur_ctx_type.clone()});
+                    self.type_check_expr(expr, &cur_ctx_type, &identifiers);
+                },
+                Stmt::Print { expr } => todo!(),
+                s => panic!("Unexpected statement {:?}", s),
+            }
+        }
+    }
+
+    pub fn get_tree(&self) -> &Ast {
         &self.tree
     }
 }
@@ -131,11 +182,11 @@ mod tests {
     use super::*;
     use crate::lexer::Lexer;
 
-    fn parse(input: &str) -> Vec<Stmt> {
+    fn parse(input: &str) -> Ast {
         let mut lexer = Lexer::new(&(input.to_owned() + "\0"));
         lexer.tokenize();
 
-        let mut parser = Ast::new(lexer.get_tokens().to_vec());
+        let mut parser = Parser::new(lexer.get_tokens().to_vec());
         parser.parse();
 
         parser.get_tree().to_vec()
@@ -160,7 +211,7 @@ mod tests {
 
     #[test]
     fn test_left_side_precedence() {
-        let ast = parse("float a = 1 * 2 + 3;");
+        let ast = parse("float a = 1 * 2 + 3.5;");
         assert_eq!(
             ast,
             [Stmt::Declare {
@@ -173,7 +224,7 @@ mod tests {
                         left: Box::new(Expr::Literal(Literal::Int("1".to_string()))),
                         right: Box::new(Expr::Literal(Literal::Int("2".to_string())))
                     }),
-                    right: Box::new(Expr::Literal(Literal::Int("3".to_string())))
+                    right: Box::new(Expr::Literal(Literal::Float("3.5".to_string())))
                 }
             }]
         );
@@ -181,7 +232,7 @@ mod tests {
 
     #[test]
     fn test_right_side_precedence() {
-        let ast = parse("float a = 1 - 2 / 3;");
+        let ast = parse("float a = 0.3333 - 2 / 3;");
         assert_eq!(
             ast,
             [Stmt::Declare {
@@ -189,7 +240,7 @@ mod tests {
                 name: "a".to_string(),
                 expr: Expr::BinOp {
                     op: BinOpKind::Sub,
-                    left: Box::new(Expr::Literal(Literal::Int("1".to_string()))),
+                    left: Box::new(Expr::Literal(Literal::Float("0.3333".to_string()))),
                     right: Box::new(Expr::BinOp {
                         op: BinOpKind::Div,
                         left: Box::new(Expr::Literal(Literal::Int("2".to_string()))),
@@ -240,5 +291,74 @@ mod tests {
                 }
             }]
         );
+    }
+
+    #[test]
+    fn test_nested_parentheses() {
+        let ast = parse("float c = ((1 + a) * b) / (a - b);");
+        assert_eq!(
+            ast,
+            [Stmt::Declare {
+                dtype: Primitive::Float,
+                name: "c".to_string(),
+                expr: Expr::BinOp {
+                    op: BinOpKind::Div,
+                    left: Box::new(Expr::BinOp {
+                        op: BinOpKind::Mult,
+                        left: Box::new(Expr::BinOp {
+                            op: BinOpKind::Add,
+                            left: Box::new(Expr::Literal(Literal::Int("1".to_string()))),
+                            right: Box::new(Expr::Identifier("a".to_string())),
+                        }),
+                        right: Box::new(Expr::Identifier("b".to_string())),
+                    }),
+                    right: Box::new(Expr::BinOp {
+                        op: BinOpKind::Sub,
+                        left: Box::new(Expr::Identifier("a".to_string())),
+                        right: Box::new(Expr::Identifier("b".to_string())),
+                    }),
+                }
+            }]
+        );
+    }
+
+    #[test]
+    fn test_print_statement() {
+        let ast = parse("print(1 * b);");
+        assert_eq!(
+            ast,
+            [Stmt::Print {
+                expr: Expr::BinOp {
+                    op: BinOpKind::Mult,
+                    left: Box::new(Expr::Literal(Literal::Int("1".to_string()))),
+                    right: Box::new(Expr::Identifier("b".to_string()))
+                }
+            }]
+        );
+    }
+
+    #[test]
+    fn test_print_statement_with_parentheses() {
+        let ast = parse("print((1 - b) * c);");
+        assert_eq!(
+            ast,
+            [Stmt::Print {
+                expr: Expr::BinOp {
+                    op: BinOpKind::Mult,
+                    left: Box::new(Expr::BinOp {
+                        op: BinOpKind::Sub,
+                        left: Box::new(Expr::Literal(Literal::Int("1".to_string()))),
+                        right: Box::new(Expr::Identifier("b".to_string()))
+                    }),
+                    right: Box::new(Expr::Identifier("c".to_string()))
+                }
+            }]
+        );
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_missing_eos_semicolon() {
+        let _ = parse("int a = 0 print(a);");
     }
 }
