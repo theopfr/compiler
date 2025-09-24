@@ -35,15 +35,17 @@ impl Parser {
         let mut lhs = match &self.consume_next().kind {
             TokenKind::Literal(literal) => Expr::Literal(literal.clone()),
             TokenKind::Identifier(name) => Expr::Identifier(name.to_string()),
-            TokenKind::BinOp(BinOpKind::Sub) => Expr::BinOp {
-                op: BinOpKind::Sub,
-                left: Box::new(Expr::Literal(Literal {
-                    value: "0".to_string(),
-                    primitive: Primitive::Int,
-                })),
-                right: Box::new(self.parse_expression(INFINITY)?),
-            },
+
+            // Handles unary '-' sign.
+            TokenKind::BinOp(BinOpKind::Sub) => Expr::UnaryOp { op: UnaryOpKind::Neg, expr: Box::new(self.parse_expression(INFINITY)?) },
+
+            // Handle unary '-' sign.
             TokenKind::BinOp(BinOpKind::Add) => self.parse_expression(INFINITY)?,
+
+            // Handle unary '!' (boolean negation).
+            TokenKind::BinOp(BinOpKind::Not) => Expr::UnaryOp { op: UnaryOpKind::Not, expr: Box::new(self.parse_expression(INFINITY)?) },
+
+            // Handle expression in parentheses.
             TokenKind::LParen => {
                 let expr = self.parse_expression(0.0)?;
                 if !matches!(self.peek_next().kind, TokenKind::RParen) {
@@ -109,6 +111,7 @@ impl Parser {
             BinOpKind::And => (2.1, 2.2),
             BinOpKind::Or => (1.1, 1.2),
             BinOpKind::Not => panic!("Unary!"),
+            BinOpKind::Assign => panic!("Assign!"),
         }
     }
 
@@ -129,7 +132,7 @@ impl Parser {
                 self.consume_next();
 
                 // Check for assign token (ie. '=')
-                if !matches!(self.peek_next().kind, TokenKind::Assign) {
+                if !matches!(self.peek_next().kind, TokenKind::BinOp(BinOpKind::Assign)) {
                     return Err(CompilerError::Syntax {
                         message: "Expected '=' after declaration.".to_string(),
                         col: 0,
@@ -307,14 +310,7 @@ mod tests {
                 name: "res".to_string(),
                 expr: Expr::BinOp {
                     op: BinOpKind::Mult,
-                    left: Box::new(Expr::BinOp {
-                        op: BinOpKind::Sub,
-                        left: Box::new(Expr::Literal(Literal {
-                            value: "0".to_string(),
-                            primitive: Primitive::Int
-                        })),
-                        right: Box::new(Expr::Identifier("b".to_string()))
-                    }),
+                    left: Box::new(Expr::UnaryOp { op: UnaryOpKind::Neg, expr: Box::new(Expr::Identifier("b".to_string())) } ),
                     right: Box::new(Expr::Literal(Literal {
                         value: "3".to_string(),
                         primitive: Primitive::Int
@@ -455,7 +451,7 @@ mod tests {
 
     #[test]
     fn test_boolean_precedence() {
-        let ast = parse("bool a = smth;").unwrap();
+        let ast = parse("bool a = true || b >= 4 && c == d != e;").unwrap();
         assert_eq!(
             ast,
             [Stmt::Declare {
@@ -468,12 +464,24 @@ mod tests {
                         primitive: Primitive::Bool
                     })),
                     right: Box::new(Expr::BinOp {
-                        op: BinOpKind::Ge,
-                        left: Box::new(Expr::Identifier("b".to_string())),
-                        right: Box::new(Expr::Literal(Literal {
-                            value: "4".to_string(),
-                            primitive: Primitive::Int
-                        })),
+                        op: BinOpKind::And,
+                        left: Box::new(Expr::BinOp {
+                            op: BinOpKind::Ge,
+                            left: Box::new(Expr::Identifier("b".to_string())),
+                            right: Box::new(Expr::Literal(Literal {
+                                value: "4".to_string(),
+                                primitive: Primitive::Int
+                            })),
+                        }),
+                        right: Box::new(Expr::BinOp {
+                            op: BinOpKind::Ne,
+                            left: Box::new(Expr::BinOp {
+                                op: BinOpKind::Eq,
+                                left: Box::new(Expr::Identifier("c".to_string())),
+                                right: Box::new(Expr::Identifier("d".to_string())),
+                            }),
+                            right: Box::new(Expr::Identifier("e".to_string())),
+                        })
                     })
                 }
             }]

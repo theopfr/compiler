@@ -1,4 +1,4 @@
-use crate::schemas::{BinOpKind, Primitive};
+use crate::schemas::{BinOpKind, Primitive, UnaryOpKind};
 use std::fmt;
 
 #[derive(Debug)]
@@ -18,6 +18,12 @@ pub enum CompilerError {
         op: BinOpKind,
         left: Primitive,
         right: Primitive,
+        col: u32,
+        pos: u32,
+    },
+    TypeUnaryOp {
+        op: UnaryOpKind,
+        operand: Primitive,
         col: u32,
         pos: u32,
     },
@@ -59,8 +65,20 @@ impl fmt::Display for CompilerError {
             } => {
                 write!(
                     f,
-                    "TypeError (line {}, position {}): Cannot apply {:?} to '{:?}' and '{:?}'.",
+                    "TypeError (line {}, position {}): Cannot binary apply {:?} to '{:?}' and '{:?}'.",
                     col, pos, op, left, right
+                )
+            }
+            CompilerError::TypeUnaryOp {
+                op,
+                operand,
+                col,
+                pos,
+            } => {
+                write!(
+                    f,
+                    "TypeError (line {}, position {}): Cannot apply unary operation '{:?}' to '{:?}''.",
+                    col, pos, op, operand
                 )
             }
             CompilerError::Name {

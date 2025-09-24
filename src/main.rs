@@ -20,10 +20,15 @@ fn compile() -> Result<(), CompilerError> {
         print(b + 3);
         int z = 10;
         float c = a + 0.4;
-        bool b = false;
+        bool b = 2 == 2;
+        bool u = true == 2;
         \0
     ";*/
-    let code = "int abc = (1 * (2 + 3));\0";
+    let code = "
+        bool a = !true;
+        bool b = (-2 > +3) == a;
+        \0
+    ";
 
     let mut lexer = Lexer::new(code);
     lexer.tokenize()?;

@@ -113,7 +113,7 @@ impl Lexer {
                         pos: self.cur_pos,
                     }),
                     _ => self.tokens.push(Token {
-                        kind: TokenKind::Assign,
+                        kind: TokenKind::BinOp(BinOpKind::Assign),
                         pos: self.cur_pos,
                     }),
                 }
@@ -167,16 +167,18 @@ impl Lexer {
             },
             '!' => {
                 match self.peek_next() {
-                    '=' => self.tokens.push(Token {
-                        kind: TokenKind::BinOp(BinOpKind::Ne),
-                        pos: self.cur_pos,
-                    }),
+                    '=' => {
+                        self.tokens.push(Token {
+                            kind: TokenKind::BinOp(BinOpKind::Ne),
+                            pos: self.cur_pos,
+                        });
+                        self.consume_next();
+                    }
                     _ => self.tokens.push(Token {
                         kind: TokenKind::BinOp(BinOpKind::Not),
                         pos: self.cur_pos,
                     }),
                 };
-                self.consume_next();
             }
             t => panic!("Ahh {}", t),
         }
@@ -273,7 +275,7 @@ mod tests {
             vec![
                 TokenKind::Declare(Primitive::Int),
                 TokenKind::Identifier("a".into()),
-                TokenKind::Assign,
+                TokenKind::BinOp(BinOpKind::Assign),
                 TokenKind::Literal(Literal {
                     value: "42".to_string(),
                     primitive: Primitive::Int
@@ -292,7 +294,7 @@ mod tests {
             vec![
                 TokenKind::Declare(Primitive::Float),
                 TokenKind::Identifier("pi".into()),
-                TokenKind::Assign,
+                TokenKind::BinOp(BinOpKind::Assign),
                 TokenKind::Literal(Literal {
                     value: "3.14".to_string(),
                     primitive: Primitive::Float
@@ -327,7 +329,7 @@ mod tests {
             vec![
                 TokenKind::Declare(Primitive::Int),
                 TokenKind::Identifier("a".into()),
-                TokenKind::Assign,
+                TokenKind::BinOp(BinOpKind::Assign),
                 TokenKind::Literal(Literal {
                     value: "3".to_string(),
                     primitive: Primitive::Int
@@ -351,7 +353,7 @@ mod tests {
             vec![
                 TokenKind::Declare(Primitive::Int),
                 TokenKind::Identifier("a".into()),
-                TokenKind::Assign,
+                TokenKind::BinOp(BinOpKind::Assign),
                 TokenKind::Literal(Literal {
                     value: "3".to_string(),
                     primitive: Primitive::Int
@@ -406,7 +408,7 @@ mod tests {
             vec![
                 TokenKind::Declare(Primitive::Int),
                 TokenKind::Identifier("my_var".into()),
-                TokenKind::Assign,
+                TokenKind::BinOp(BinOpKind::Assign),
                 TokenKind::Literal(Literal {
                     value: "1".to_string(),
                     primitive: Primitive::Int
@@ -425,7 +427,7 @@ mod tests {
             vec![
                 TokenKind::Declare(Primitive::Bool),
                 TokenKind::Identifier("b".into()),
-                TokenKind::Assign,
+                TokenKind::BinOp(BinOpKind::Assign),
                 TokenKind::Literal(Literal {
                     value: "true".to_string(),
                     primitive: Primitive::Bool
@@ -469,7 +471,7 @@ mod tests {
             vec![
                 TokenKind::Declare(Primitive::Int),
                 TokenKind::Identifier("a".into()),
-                TokenKind::Assign,
+                TokenKind::BinOp(BinOpKind::Assign),
                 TokenKind::Literal(Literal {
                     value: "1".to_string(),
                     primitive: Primitive::Int
