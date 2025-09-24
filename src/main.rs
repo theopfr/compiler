@@ -6,14 +6,17 @@ mod schemas;
 use crate::{lexer::*, parser::Parser, semantic::SemanticAnalyser};
 
 fn main() {
-    let code = "
+    /*let code = "
         int a = (1 * (2 + 3)) / 3;\n
         int b = -a + a / 5;\n
         float c = (1.0 + 2.0) * 3.0;\0
-    ";
-    /*let code = "
-        print(\"hi\" + \"hi\" / \"hi\");\0
     ";*/
+    let code = "
+        int a = (1 * (2 + 3));\n
+        float b = -a / 5;\n
+        print(b + 3);
+        \0
+    ";
 
     let mut lexer = Lexer::new(code);
     lexer.tokenize();
