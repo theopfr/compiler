@@ -25,7 +25,7 @@ fn compile() -> Result<(), CompilerError> {
         \0
     ";*/
     let code = "
-        bool a = !true;
+        bool a = !!!true;
         bool b = (-2 > +3) == a;
         \0
     ";

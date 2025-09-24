@@ -37,13 +37,19 @@ impl Parser {
             TokenKind::Identifier(name) => Expr::Identifier(name.to_string()),
 
             // Handles unary '-' sign.
-            TokenKind::BinOp(BinOpKind::Sub) => Expr::UnaryOp { op: UnaryOpKind::Neg, expr: Box::new(self.parse_expression(INFINITY)?) },
+            TokenKind::BinOp(BinOpKind::Sub) => Expr::UnaryOp {
+                op: UnaryOpKind::Neg,
+                expr: Box::new(self.parse_expression(INFINITY)?),
+            },
 
             // Handle unary '-' sign.
             TokenKind::BinOp(BinOpKind::Add) => self.parse_expression(INFINITY)?,
 
             // Handle unary '!' (boolean negation).
-            TokenKind::BinOp(BinOpKind::Not) => Expr::UnaryOp { op: UnaryOpKind::Not, expr: Box::new(self.parse_expression(INFINITY)?) },
+            TokenKind::BinOp(BinOpKind::Not) => Expr::UnaryOp {
+                op: UnaryOpKind::Not,
+                expr: Box::new(self.parse_expression(INFINITY)?),
+            },
 
             // Handle expression in parentheses.
             TokenKind::LParen => {
@@ -310,7 +316,10 @@ mod tests {
                 name: "res".to_string(),
                 expr: Expr::BinOp {
                     op: BinOpKind::Mult,
-                    left: Box::new(Expr::UnaryOp { op: UnaryOpKind::Neg, expr: Box::new(Expr::Identifier("b".to_string())) } ),
+                    left: Box::new(Expr::UnaryOp {
+                        op: UnaryOpKind::Neg,
+                        expr: Box::new(Expr::Identifier("b".to_string()))
+                    }),
                     right: Box::new(Expr::Literal(Literal {
                         value: "3".to_string(),
                         primitive: Primitive::Int
@@ -443,6 +452,32 @@ mod tests {
                             value: "4".to_string(),
                             primitive: Primitive::Int
                         })),
+                    })
+                }
+            }]
+        );
+    }
+
+    #[test]
+    fn test_logical_not_unary_operation() {
+        let ast = parse("bool a = !(true && !b);").unwrap();
+        assert_eq!(
+            ast,
+            [Stmt::Declare {
+                dtype: Primitive::Bool,
+                name: "a".to_string(),
+                expr: Expr::UnaryOp {
+                    op: UnaryOpKind::Not,
+                    expr: Box::new(Expr::BinOp {
+                        op: BinOpKind::And,
+                        left: Box::new(Expr::Literal(Literal {
+                            value: "true".to_string(),
+                            primitive: Primitive::Bool
+                        })),
+                        right: Box::new(Expr::UnaryOp {
+                            op: UnaryOpKind::Not,
+                            expr: Box::new(Expr::Identifier("b".to_string()))
+                        })
                     })
                 }
             }]
