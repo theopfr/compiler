@@ -1,6 +1,6 @@
 use std::f32::INFINITY;
 
-use crate::schemas::*;
+use crate::{errors::CompilerError, schemas::*};
 
 pub struct Parser {
     tokens: Vec<Token>,
@@ -18,35 +18,51 @@ impl Parser {
     }
 
     fn peek_next(&self) -> Token {
-        self.tokens
-            .last()
-            .cloned()
-            .unwrap_or(Token { kind: TokenKind::EOF, pos: self.tokens.len() })
-    }
-    
-    fn consume_next(&mut self) -> Token {
-        self.tokens.pop().unwrap_or(Token { kind: TokenKind::EOF, pos: self.tokens.len() })
+        self.tokens.last().cloned().unwrap_or(Token {
+            kind: TokenKind::EOF,
+            pos: self.tokens.len(),
+        })
     }
 
-    fn parse_expression(&mut self, min_binding_pow: f32) -> Expr {
+    fn consume_next(&mut self) -> Token {
+        self.tokens.pop().unwrap_or(Token {
+            kind: TokenKind::EOF,
+            pos: self.tokens.len(),
+        })
+    }
+
+    fn parse_expression(&mut self, min_binding_pow: f32) -> Result<Expr, CompilerError> {
         let mut lhs = match &self.consume_next().kind {
             TokenKind::Literal(literal) => Expr::Literal(literal.clone()),
             TokenKind::Identifier(name) => Expr::Identifier(name.to_string()),
             TokenKind::BinOp(BinOpKind::Sub) => Expr::BinOp {
                 op: BinOpKind::Sub,
-                left: Box::new(Expr::Literal(Literal { value: "0".to_string(), primitive: Primitive::Int })),
-                right: Box::new(self.parse_expression(INFINITY)),
+                left: Box::new(Expr::Literal(Literal {
+                    value: "0".to_string(),
+                    primitive: Primitive::Int,
+                })),
+                right: Box::new(self.parse_expression(INFINITY)?),
             },
-            TokenKind::BinOp(BinOpKind::Add) => self.parse_expression(INFINITY),
+            TokenKind::BinOp(BinOpKind::Add) => self.parse_expression(INFINITY)?,
             TokenKind::LParen => {
-                let expr = self.parse_expression(0.0);
+                let expr = self.parse_expression(0.0)?;
                 if !matches!(self.peek_next().kind, TokenKind::RParen) {
-                    panic!("Expected ')'.");
+                    return Err(CompilerError::Syntax {
+                        message: "Expected closing ')'.".to_string(),
+                        col: 0,
+                        pos: 0,
+                    });
                 }
                 self.consume_next();
                 expr
             }
-            t => panic!("Unexpected token {:?}.", t),
+            t => {
+                return Err(CompilerError::Syntax {
+                    message: format!("Unexpected token {:?}.", t),
+                    col: 0,
+                    pos: 0,
+                });
+            }
         };
 
         loop {
@@ -65,17 +81,23 @@ impl Parser {
                     lhs = Expr::BinOp {
                         op: op_clone,
                         left: Box::new(lhs),
-                        right: Box::new(self.parse_expression(rbp.clone())),
+                        right: Box::new(self.parse_expression(rbp.clone())?),
                     };
                 }
                 TokenKind::EOS => break,
                 TokenKind::EOF => break,
                 TokenKind::RParen => break,
-                t => panic!("Unexpected token {:?}.", t),
+                t => {
+                    return Err(CompilerError::Syntax {
+                        message: format!("Unexpected token {:?}.", t),
+                        col: 0,
+                        pos: 0,
+                    });
+                }
             };
         }
 
-        lhs
+        Ok(lhs)
     }
 
     fn airthmetic_binding_power(op: &BinOpKind) -> (f32, f32) {
@@ -85,50 +107,76 @@ impl Parser {
         }
     }
 
-    fn parse_statement(&mut self) -> Stmt {
+    fn parse_statement(&mut self) -> Result<Stmt, CompilerError> {
         match self.consume_next().clone().kind {
             TokenKind::Declare(ref primitive) => {
                 // Check for identifier (ie. variable name)
                 let identifer_name = match self.peek_next().clone().kind {
                     TokenKind::Identifier(name) => name,
-                    t => panic!("Unexpected token {:?}.", t),
+                    t => {
+                        return Err(CompilerError::Syntax {
+                            message: format!("Unexpected token {:?}.", t),
+                            col: 0,
+                            pos: 0,
+                        });
+                    }
                 };
                 self.consume_next();
 
                 // Check for assign token (ie. '=')
                 if !matches!(self.peek_next().kind, TokenKind::Assign) {
-                    panic!("Expected '=' after declaration.");
+                    return Err(CompilerError::Syntax {
+                        message: "Expected '=' after declaration.".to_string(),
+                        col: 0,
+                        pos: 0,
+                    });
                 }
                 self.consume_next();
 
-                Stmt::Declare {
+                Ok(Stmt::Declare {
                     dtype: primitive.clone(),
                     name: identifer_name.clone(),
-                    expr: self.parse_expression(0.0),
-                }
+                    expr: self.parse_expression(0.0)?,
+                })
             }
             TokenKind::Print => {
                 if !matches!(self.peek_next().kind, TokenKind::LParen) {
-                    panic!("Expected '(' after 'print' keyword.");
+                    return Err(CompilerError::Syntax {
+                        message: "Expected opening '(' after 'print' keyword.".to_string(),
+                        col: 0,
+                        pos: 0,
+                    });
                 }
                 self.consume_next();
-                let expr = self.parse_expression(0.0);
+                let expr = self.parse_expression(0.0)?;
                 if !matches!(self.peek_next().kind, TokenKind::RParen) {
-                    panic!("Expected ')'.");
+                    return Err(CompilerError::Syntax {
+                        message: "Expected closing ')'.".to_string(),
+                        col: 0,
+                        pos: 0,
+                    });
                 }
                 self.consume_next();
 
-                Stmt::Print { expr: expr }
+                Ok(Stmt::Print { expr })
             }
-            k => panic!("Unexpected token kind {:?}.", k),
+            k => Err(CompilerError::Syntax {
+                message: format!("Unexpected token of kind {:?}.", k),
+                col: 0,
+                pos: 0,
+            }),
         }
     }
 
-    pub fn parse(&mut self) {
+    pub fn parse(&mut self) -> Result<(), CompilerError> {
         while !matches!(self.peek_next().kind, TokenKind::EOF) {
-            let stmt = self.parse_statement();
+            let stmt = self.parse_statement()?;
             if !matches!(self.peek_next().kind, TokenKind::EOS) {
-                panic!("Expected ';' at end of expression.");
+                return Err(CompilerError::Syntax {
+                    message: "Expected ';' at end of expression.".to_string(),
+                    col: 0,
+                    pos: 0,
+                });
             }
 
             self.tree.push(stmt);
@@ -137,6 +185,8 @@ impl Parser {
                 self.consume_next();
             }
         }
+
+        Ok(())
     }
 
     pub fn get_tree(&self) -> &Ast {
@@ -149,19 +199,19 @@ mod tests {
     use super::*;
     use crate::lexer::Lexer;
 
-    fn parse(input: &str) -> Ast {
+    fn parse(input: &str) -> Result<Ast, CompilerError> {
         let mut lexer = Lexer::new(&(input.to_owned() + "\0"));
-        lexer.tokenize();
+        lexer.tokenize()?; // propagate error
 
         let mut parser = Parser::new(lexer.get_tokens().to_vec());
-        parser.parse();
+        parser.parse()?; // propagate error
 
-        parser.get_tree().to_vec()
+        Ok(parser.get_tree().to_vec())
     }
 
     #[test]
     fn test_simple_statement() {
-        let ast = parse("int a = 1 + 2;");
+        let ast = parse("int a = 1 + 2;").unwrap();
         assert_eq!(
             ast,
             [Stmt::Declare {
@@ -169,8 +219,14 @@ mod tests {
                 name: "a".to_string(),
                 expr: Expr::BinOp {
                     op: BinOpKind::Add,
-                    left: Box::new(Expr::Literal(Literal { value: "1".to_string(), primitive: Primitive::Int })),
-                    right: Box::new(Expr::Literal(Literal { value: "2".to_string(), primitive: Primitive::Int }))
+                    left: Box::new(Expr::Literal(Literal {
+                        value: "1".to_string(),
+                        primitive: Primitive::Int
+                    })),
+                    right: Box::new(Expr::Literal(Literal {
+                        value: "2".to_string(),
+                        primitive: Primitive::Int
+                    }))
                 }
             }]
         );
@@ -178,7 +234,7 @@ mod tests {
 
     #[test]
     fn test_left_side_precedence() {
-        let ast = parse("float a = 1 * 2 + 3.5;");
+        let ast = parse("float a = 1 * 2 + 3.5;").unwrap();
         assert_eq!(
             ast,
             [Stmt::Declare {
@@ -188,10 +244,19 @@ mod tests {
                     op: BinOpKind::Add,
                     left: Box::new(Expr::BinOp {
                         op: BinOpKind::Mult,
-                        left: Box::new(Expr::Literal(Literal { value: "1".to_string(), primitive: Primitive::Int })),
-                        right: Box::new(Expr::Literal(Literal { value: "2".to_string(), primitive: Primitive::Int }))
+                        left: Box::new(Expr::Literal(Literal {
+                            value: "1".to_string(),
+                            primitive: Primitive::Int
+                        })),
+                        right: Box::new(Expr::Literal(Literal {
+                            value: "2".to_string(),
+                            primitive: Primitive::Int
+                        }))
                     }),
-                    right: Box::new(Expr::Literal(Literal { value: "3.5".to_string(), primitive: Primitive::Float }))
+                    right: Box::new(Expr::Literal(Literal {
+                        value: "3.5".to_string(),
+                        primitive: Primitive::Float
+                    }))
                 }
             }]
         );
@@ -199,7 +264,7 @@ mod tests {
 
     #[test]
     fn test_right_side_precedence() {
-        let ast = parse("float a = 0.3333 - 2 / 3;");
+        let ast = parse("float a = 0.3333 - 2 / 3;").unwrap();
         assert_eq!(
             ast,
             [Stmt::Declare {
@@ -207,11 +272,20 @@ mod tests {
                 name: "a".to_string(),
                 expr: Expr::BinOp {
                     op: BinOpKind::Sub,
-                    left: Box::new(Expr::Literal(Literal { value: "0.3333".to_string(), primitive: Primitive::Float })),
+                    left: Box::new(Expr::Literal(Literal {
+                        value: "0.3333".to_string(),
+                        primitive: Primitive::Float
+                    })),
                     right: Box::new(Expr::BinOp {
                         op: BinOpKind::Div,
-                        left: Box::new(Expr::Literal(Literal { value: "2".to_string(), primitive: Primitive::Int })),
-                        right: Box::new(Expr::Literal(Literal { value: "3".to_string(), primitive: Primitive::Int }))
+                        left: Box::new(Expr::Literal(Literal {
+                            value: "2".to_string(),
+                            primitive: Primitive::Int
+                        })),
+                        right: Box::new(Expr::Literal(Literal {
+                            value: "3".to_string(),
+                            primitive: Primitive::Int
+                        }))
                     }),
                 }
             }]
@@ -220,7 +294,7 @@ mod tests {
 
     #[test]
     fn test_unary_operator() {
-        let ast = parse("int res = -b * +3;");
+        let ast = parse("int res = -b * +3;").unwrap();
         assert_eq!(
             ast,
             [Stmt::Declare {
@@ -230,10 +304,16 @@ mod tests {
                     op: BinOpKind::Mult,
                     left: Box::new(Expr::BinOp {
                         op: BinOpKind::Sub,
-                        left: Box::new(Expr::Literal(Literal { value: "0".to_string(), primitive: Primitive::Int })),
+                        left: Box::new(Expr::Literal(Literal {
+                            value: "0".to_string(),
+                            primitive: Primitive::Int
+                        })),
                         right: Box::new(Expr::Identifier("b".to_string()))
                     }),
-                    right: Box::new(Expr::Literal(Literal { value: "3".to_string(), primitive: Primitive::Int })),
+                    right: Box::new(Expr::Literal(Literal {
+                        value: "3".to_string(),
+                        primitive: Primitive::Int
+                    })),
                 }
             }]
         );
@@ -241,7 +321,7 @@ mod tests {
 
     #[test]
     fn test_simple_parentheses() {
-        let ast = parse("int c = (1 + 2) * 3;");
+        let ast = parse("int c = (1 + 2) * 3;").unwrap();
         assert_eq!(
             ast,
             [Stmt::Declare {
@@ -251,10 +331,19 @@ mod tests {
                     op: BinOpKind::Mult,
                     left: Box::new(Expr::BinOp {
                         op: BinOpKind::Add,
-                        left: Box::new(Expr::Literal(Literal { value: "1".to_string(), primitive: Primitive::Int })),
-                        right: Box::new(Expr::Literal(Literal { value: "2".to_string(), primitive: Primitive::Int })),
+                        left: Box::new(Expr::Literal(Literal {
+                            value: "1".to_string(),
+                            primitive: Primitive::Int
+                        })),
+                        right: Box::new(Expr::Literal(Literal {
+                            value: "2".to_string(),
+                            primitive: Primitive::Int
+                        })),
                     }),
-                    right: Box::new(Expr::Literal(Literal { value: "3".to_string(), primitive: Primitive::Int })),
+                    right: Box::new(Expr::Literal(Literal {
+                        value: "3".to_string(),
+                        primitive: Primitive::Int
+                    })),
                 }
             }]
         );
@@ -262,7 +351,7 @@ mod tests {
 
     #[test]
     fn test_nested_parentheses() {
-        let ast = parse("float c = ((1 + a) * b) / (a - b);");
+        let ast = parse("float c = ((1 + a) * b) / (a - b);").unwrap();
         assert_eq!(
             ast,
             [Stmt::Declare {
@@ -274,7 +363,10 @@ mod tests {
                         op: BinOpKind::Mult,
                         left: Box::new(Expr::BinOp {
                             op: BinOpKind::Add,
-                            left: Box::new(Expr::Literal(Literal { value: "1".to_string(), primitive: Primitive::Int })),
+                            left: Box::new(Expr::Literal(Literal {
+                                value: "1".to_string(),
+                                primitive: Primitive::Int
+                            })),
                             right: Box::new(Expr::Identifier("a".to_string())),
                         }),
                         right: Box::new(Expr::Identifier("b".to_string())),
@@ -291,13 +383,16 @@ mod tests {
 
     #[test]
     fn test_print_statement() {
-        let ast = parse("print(1 * b);");
+        let ast = parse("print(1 * b);").unwrap();
         assert_eq!(
             ast,
             [Stmt::Print {
                 expr: Expr::BinOp {
                     op: BinOpKind::Mult,
-                    left: Box::new(Expr::Literal(Literal { value: "1".to_string(), primitive: Primitive::Int })),
+                    left: Box::new(Expr::Literal(Literal {
+                        value: "1".to_string(),
+                        primitive: Primitive::Int
+                    })),
                     right: Box::new(Expr::Identifier("b".to_string()))
                 }
             }]
@@ -306,7 +401,7 @@ mod tests {
 
     #[test]
     fn test_print_statement_with_parentheses() {
-        let ast = parse("print((1 - b) * c);");
+        let ast = parse("print((1 - b) * c);").unwrap();
         assert_eq!(
             ast,
             [Stmt::Print {
@@ -314,7 +409,10 @@ mod tests {
                     op: BinOpKind::Mult,
                     left: Box::new(Expr::BinOp {
                         op: BinOpKind::Sub,
-                        left: Box::new(Expr::Literal(Literal { value: "1".to_string(), primitive: Primitive::Int })),
+                        left: Box::new(Expr::Literal(Literal {
+                            value: "1".to_string(),
+                            primitive: Primitive::Int
+                        })),
                         right: Box::new(Expr::Identifier("b".to_string()))
                     }),
                     right: Box::new(Expr::Identifier("c".to_string()))
@@ -324,8 +422,8 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
     fn test_missing_eos_semicolon() {
-        let _ = parse("int a = 0 print(a);");
+        let result = parse("int a = 0 print(a);");
+        assert!(matches!(result, Err(CompilerError::Syntax { .. })));
     }
 }

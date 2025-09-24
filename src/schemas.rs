@@ -4,7 +4,6 @@
 pub enum Primitive {
     Int,
     Float,
-    Str,
     Auto
 }
 
@@ -66,8 +65,6 @@ pub enum Expr {
 pub enum Stmt {
     Declare { dtype: Primitive, name: String, expr: Expr },
     Print { expr: Expr },
-    EOF,
-    EOS
 }
 
 
