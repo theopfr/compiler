@@ -5,19 +5,19 @@ pub enum Primitive {
     Int,
     Float,
     Str,
+    Auto
 }
 
+#[derive(Debug)]
 pub struct Identifier {
-    pub name: String,
     pub primitive: Primitive
 }
 
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum Literal {
-    Int(String),
-    Float(String),
-    Str(String),
+pub struct Literal {
+    pub value: String,
+    pub primitive: Primitive
 }
 
 // lexer schemas
@@ -70,12 +70,5 @@ pub enum Stmt {
     EOS
 }
 
-
-pub enum ContextType {
-    Int,
-    Float,
-    Str,
-    Auto
-}
 
 pub type Ast = Vec<Stmt>;

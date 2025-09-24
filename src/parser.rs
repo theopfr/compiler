@@ -34,7 +34,7 @@ impl Parser {
             TokenKind::Identifier(name) => Expr::Identifier(name.to_string()),
             TokenKind::BinOp(BinOpKind::Sub) => Expr::BinOp {
                 op: BinOpKind::Sub,
-                left: Box::new(Expr::Literal(Literal::Int("0".to_string()))),
+                left: Box::new(Expr::Literal(Literal { value: "0".to_string(), primitive: Primitive::Int })),
                 right: Box::new(self.parse_expression(INFINITY)),
             },
             TokenKind::BinOp(BinOpKind::Add) => self.parse_expression(INFINITY),
@@ -139,39 +139,6 @@ impl Parser {
         }
     }
 
-    fn type_check_expr(&self, expr: &Expr, ctx_type: &Primitive, identifiers: &Vec<Identifier>) {
-        match expr {
-            Expr::Literal(literal) => {
-                
-            },
-            Expr::Identifier(name) => {
-
-            },
-            Expr::BinOp { op: _, left, right } => {
-                self.type_check_expr(left, &ctx_type, &identifiers);
-                self.type_check_expr(right, &ctx_type, &identifiers);
-            },
-        }
-    }
-
-    pub fn type_check(&self) {
-        let mut identifiers: Vec<Identifier> = vec![];
-
-        for stmt in &self.tree {
-            let mut cur_ctx_type = Primitive::Int;
-
-            match stmt {
-                Stmt::Declare { dtype, name, expr } => {
-                    cur_ctx_type = dtype.clone();
-                    identifiers.push(Identifier { name: name.to_string(), primitive: cur_ctx_type.clone()});
-                    self.type_check_expr(expr, &cur_ctx_type, &identifiers);
-                },
-                Stmt::Print { expr } => todo!(),
-                s => panic!("Unexpected statement {:?}", s),
-            }
-        }
-    }
-
     pub fn get_tree(&self) -> &Ast {
         &self.tree
     }
@@ -202,8 +169,8 @@ mod tests {
                 name: "a".to_string(),
                 expr: Expr::BinOp {
                     op: BinOpKind::Add,
-                    left: Box::new(Expr::Literal(Literal::Int("1".to_string()))),
-                    right: Box::new(Expr::Literal(Literal::Int("2".to_string())))
+                    left: Box::new(Expr::Literal(Literal { value: "1".to_string(), primitive: Primitive::Int })),
+                    right: Box::new(Expr::Literal(Literal { value: "2".to_string(), primitive: Primitive::Int }))
                 }
             }]
         );
@@ -221,10 +188,10 @@ mod tests {
                     op: BinOpKind::Add,
                     left: Box::new(Expr::BinOp {
                         op: BinOpKind::Mult,
-                        left: Box::new(Expr::Literal(Literal::Int("1".to_string()))),
-                        right: Box::new(Expr::Literal(Literal::Int("2".to_string())))
+                        left: Box::new(Expr::Literal(Literal { value: "1".to_string(), primitive: Primitive::Int })),
+                        right: Box::new(Expr::Literal(Literal { value: "2".to_string(), primitive: Primitive::Int }))
                     }),
-                    right: Box::new(Expr::Literal(Literal::Float("3.5".to_string())))
+                    right: Box::new(Expr::Literal(Literal { value: "3.5".to_string(), primitive: Primitive::Float }))
                 }
             }]
         );
@@ -240,11 +207,11 @@ mod tests {
                 name: "a".to_string(),
                 expr: Expr::BinOp {
                     op: BinOpKind::Sub,
-                    left: Box::new(Expr::Literal(Literal::Float("0.3333".to_string()))),
+                    left: Box::new(Expr::Literal(Literal { value: "0.3333".to_string(), primitive: Primitive::Float })),
                     right: Box::new(Expr::BinOp {
                         op: BinOpKind::Div,
-                        left: Box::new(Expr::Literal(Literal::Int("2".to_string()))),
-                        right: Box::new(Expr::Literal(Literal::Int("3".to_string())))
+                        left: Box::new(Expr::Literal(Literal { value: "2".to_string(), primitive: Primitive::Int })),
+                        right: Box::new(Expr::Literal(Literal { value: "3".to_string(), primitive: Primitive::Int }))
                     }),
                 }
             }]
@@ -263,10 +230,10 @@ mod tests {
                     op: BinOpKind::Mult,
                     left: Box::new(Expr::BinOp {
                         op: BinOpKind::Sub,
-                        left: Box::new(Expr::Literal(Literal::Int("0".to_string()))),
+                        left: Box::new(Expr::Literal(Literal { value: "0".to_string(), primitive: Primitive::Int })),
                         right: Box::new(Expr::Identifier("b".to_string()))
                     }),
-                    right: Box::new(Expr::Literal(Literal::Int("3".to_string()))),
+                    right: Box::new(Expr::Literal(Literal { value: "3".to_string(), primitive: Primitive::Int })),
                 }
             }]
         );
@@ -284,10 +251,10 @@ mod tests {
                     op: BinOpKind::Mult,
                     left: Box::new(Expr::BinOp {
                         op: BinOpKind::Add,
-                        left: Box::new(Expr::Literal(Literal::Int("1".to_string()))),
-                        right: Box::new(Expr::Literal(Literal::Int("2".to_string()))),
+                        left: Box::new(Expr::Literal(Literal { value: "1".to_string(), primitive: Primitive::Int })),
+                        right: Box::new(Expr::Literal(Literal { value: "2".to_string(), primitive: Primitive::Int })),
                     }),
-                    right: Box::new(Expr::Literal(Literal::Int("3".to_string()))),
+                    right: Box::new(Expr::Literal(Literal { value: "3".to_string(), primitive: Primitive::Int })),
                 }
             }]
         );
@@ -307,7 +274,7 @@ mod tests {
                         op: BinOpKind::Mult,
                         left: Box::new(Expr::BinOp {
                             op: BinOpKind::Add,
-                            left: Box::new(Expr::Literal(Literal::Int("1".to_string()))),
+                            left: Box::new(Expr::Literal(Literal { value: "1".to_string(), primitive: Primitive::Int })),
                             right: Box::new(Expr::Identifier("a".to_string())),
                         }),
                         right: Box::new(Expr::Identifier("b".to_string())),
@@ -330,7 +297,7 @@ mod tests {
             [Stmt::Print {
                 expr: Expr::BinOp {
                     op: BinOpKind::Mult,
-                    left: Box::new(Expr::Literal(Literal::Int("1".to_string()))),
+                    left: Box::new(Expr::Literal(Literal { value: "1".to_string(), primitive: Primitive::Int })),
                     right: Box::new(Expr::Identifier("b".to_string()))
                 }
             }]
@@ -347,7 +314,7 @@ mod tests {
                     op: BinOpKind::Mult,
                     left: Box::new(Expr::BinOp {
                         op: BinOpKind::Sub,
-                        left: Box::new(Expr::Literal(Literal::Int("1".to_string()))),
+                        left: Box::new(Expr::Literal(Literal { value: "1".to_string(), primitive: Primitive::Int })),
                         right: Box::new(Expr::Identifier("b".to_string()))
                     }),
                     right: Box::new(Expr::Identifier("c".to_string()))

@@ -65,9 +65,9 @@ impl Lexer {
 
         self.tokens.push(Token {
             kind: TokenKind::Literal(if numeric_token.contains('.') {
-                Literal::Float(numeric_token)
+                Literal { value: numeric_token, primitive: Primitive::Float }
             } else {
-                Literal::Int(numeric_token)
+                Literal { value: numeric_token, primitive: Primitive::Int }
             }),
             pos: start,
         });
@@ -82,7 +82,7 @@ impl Lexer {
                 let string_token: String = self.chars[start..self.cur_pos].iter().collect();
 
                 self.tokens.push(Token {
-                    kind: TokenKind::Literal(Literal::Str(string_token)),
+                    kind: TokenKind::Literal(Literal { value: string_token, primitive: Primitive::Str }),
                     pos: start,
                 });
 
@@ -189,7 +189,7 @@ mod tests {
                 TokenKind::Declare(Primitive::Int),
                 TokenKind::Identifier("a".into()),
                 TokenKind::Assign,
-                TokenKind::Literal(Literal::Int("42".into())),
+                TokenKind::Literal(Literal { value: "42".to_string(), primitive: Primitive::Int }),
                 TokenKind::EOS,
                 TokenKind::EOF,
             ]
@@ -205,7 +205,7 @@ mod tests {
                 TokenKind::Declare(Primitive::Float),
                 TokenKind::Identifier("pi".into()),
                 TokenKind::Assign,
-                TokenKind::Literal(Literal::Float("3.14".into())),
+                TokenKind::Literal(Literal { value: "3.14".to_string(), primitive: Primitive::Float }),
                 TokenKind::EOS,
                 TokenKind::EOF,
             ]
@@ -237,9 +237,9 @@ mod tests {
                 TokenKind::Declare(Primitive::Int),
                 TokenKind::Identifier("a".into()),
                 TokenKind::Assign,
-                TokenKind::Literal(Literal::Int("3".into())),
+                TokenKind::Literal(Literal { value: "3".to_string(), primitive: Primitive::Int }),
                 TokenKind::BinOp(BinOpKind::Add),
-                TokenKind::Literal(Literal::Int("5".into())),
+                TokenKind::Literal(Literal { value: "5".to_string(), primitive: Primitive::Int }),
                 TokenKind::EOS,
                 TokenKind::EOF,
             ]
@@ -255,11 +255,11 @@ mod tests {
                 TokenKind::Declare(Primitive::Int),
                 TokenKind::Identifier("a".into()),
                 TokenKind::Assign,
-                TokenKind::Literal(Literal::Int("3".into())),
+                TokenKind::Literal(Literal { value: "3".to_string(), primitive: Primitive::Int }),
                 TokenKind::BinOp(BinOpKind::Mult),
                 TokenKind::LParen,
                 TokenKind::BinOp(BinOpKind::Sub),
-                TokenKind::Literal(Literal::Int("5".into())),
+                TokenKind::Literal(Literal { value: "5".to_string(), primitive: Primitive::Int }),
                 TokenKind::RParen,
                 TokenKind::EOS,
                 TokenKind::EOF,
@@ -274,12 +274,12 @@ mod tests {
             tokens,
             vec![
                 TokenKind::LParen,
-                TokenKind::Literal(Literal::Int("2".into())),
+                TokenKind::Literal(Literal { value: "2".to_string(), primitive: Primitive::Int }),
                 TokenKind::BinOp(BinOpKind::Mult),
-                TokenKind::Literal(Literal::Int("4".into())),
+                TokenKind::Literal(Literal { value: "4".to_string(), primitive: Primitive::Int }),
                 TokenKind::RParen,
                 TokenKind::BinOp(BinOpKind::Div),
-                TokenKind::Literal(Literal::Float(".5".into())),
+                TokenKind::Literal(Literal { value: ".5".to_string(), primitive: Primitive::Float }),
                 TokenKind::EOS,
                 TokenKind::EOF,
             ]
@@ -295,7 +295,7 @@ mod tests {
                 TokenKind::Declare(Primitive::Int),
                 TokenKind::Identifier("my_var".into()),
                 TokenKind::Assign,
-                TokenKind::Literal(Literal::Int("1".into())),
+                TokenKind::Literal(Literal { value: "1".to_string(), primitive: Primitive::Int }),
                 TokenKind::EOS,
                 TokenKind::EOF,
             ]
@@ -317,7 +317,7 @@ mod tests {
                 TokenKind::Declare(Primitive::Str),
                 TokenKind::Identifier("a".into()),
                 TokenKind::Assign,
-                TokenKind::Literal(Literal::Str("hello".to_string())),
+                TokenKind::Literal(Literal { value: "hello".to_string(), primitive: Primitive::Str }),
                 TokenKind::EOS,
                 TokenKind::EOF,
             ]
@@ -330,7 +330,7 @@ mod tests {
         assert_eq!(
             tokens,
             vec![
-                TokenKind::Literal(Literal::Str("4 + 3".to_string())),
+                TokenKind::Literal(Literal { value: "4 + 3".to_string(), primitive: Primitive::Str }),
                 TokenKind::EOF
             ]
         );
@@ -344,7 +344,7 @@ mod tests {
             vec![
                 TokenKind::Print,
                 TokenKind::LParen,
-                TokenKind::Literal(Literal::Str("".to_string())),
+                TokenKind::Literal(Literal { value: "".to_string(), primitive: Primitive::Str }),
                 TokenKind::RParen,
                 TokenKind::EOF
             ]
