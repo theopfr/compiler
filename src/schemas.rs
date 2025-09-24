@@ -4,7 +4,7 @@
 pub enum Primitive {
     Int,
     Float,
-    Auto
+    Bool
 }
 
 #[derive(Debug)]
@@ -48,6 +48,15 @@ pub enum BinOpKind {
     Sub,
     Mult,
     Div,
+    Gt,
+    Lt,
+    Ge,
+    Le,
+    Eq,
+    Ne,
+    And,
+    Or,
+    Not
 }
 
 #[derive(PartialEq, Clone, Debug)]

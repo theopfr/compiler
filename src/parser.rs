@@ -102,8 +102,13 @@ impl Parser {
 
     fn airthmetic_binding_power(op: &BinOpKind) -> (f32, f32) {
         match op {
-            BinOpKind::Add | BinOpKind::Sub => (1.1, 1.2),
-            BinOpKind::Mult | BinOpKind::Div => (2.1, 2.2),
+            BinOpKind::Mult | BinOpKind::Div => (6.1, 6.2),
+            BinOpKind::Add | BinOpKind::Sub => (5.1, 5.2),
+            BinOpKind::Gt | BinOpKind::Lt | BinOpKind::Ge | BinOpKind::Le => (4.1, 4.2),
+            BinOpKind::Eq | BinOpKind::Ne => (3.1, 3.2),
+            BinOpKind::And => (2.1, 2.2),
+            BinOpKind::Or => (1.1, 1.2),
+            BinOpKind::Not => panic!("Unary!"),
         }
     }
 
@@ -293,7 +298,7 @@ mod tests {
     }
 
     #[test]
-    fn test_unary_operator() {
+    fn test_unary_sign_operator() {
         let ast = parse("int res = -b * +3;").unwrap();
         assert_eq!(
             ast,
@@ -416,6 +421,60 @@ mod tests {
                         right: Box::new(Expr::Identifier("b".to_string()))
                     }),
                     right: Box::new(Expr::Identifier("c".to_string()))
+                }
+            }]
+        );
+    }
+
+    #[test]
+    fn test_boolean_statement() {
+        let ast = parse("bool a = true || (b >= 4);").unwrap();
+        assert_eq!(
+            ast,
+            [Stmt::Declare {
+                dtype: Primitive::Bool,
+                name: "a".to_string(),
+                expr: Expr::BinOp {
+                    op: BinOpKind::Or,
+                    left: Box::new(Expr::Literal(Literal {
+                        value: "true".to_string(),
+                        primitive: Primitive::Bool
+                    })),
+                    right: Box::new(Expr::BinOp {
+                        op: BinOpKind::Ge,
+                        left: Box::new(Expr::Identifier("b".to_string())),
+                        right: Box::new(Expr::Literal(Literal {
+                            value: "4".to_string(),
+                            primitive: Primitive::Int
+                        })),
+                    })
+                }
+            }]
+        );
+    }
+
+    #[test]
+    fn test_boolean_precedence() {
+        let ast = parse("bool a = smth;").unwrap();
+        assert_eq!(
+            ast,
+            [Stmt::Declare {
+                dtype: Primitive::Bool,
+                name: "a".to_string(),
+                expr: Expr::BinOp {
+                    op: BinOpKind::Or,
+                    left: Box::new(Expr::Literal(Literal {
+                        value: "true".to_string(),
+                        primitive: Primitive::Bool
+                    })),
+                    right: Box::new(Expr::BinOp {
+                        op: BinOpKind::Ge,
+                        left: Box::new(Expr::Identifier("b".to_string())),
+                        right: Box::new(Expr::Literal(Literal {
+                            value: "4".to_string(),
+                            primitive: Primitive::Int
+                        })),
+                    })
                 }
             }]
         );

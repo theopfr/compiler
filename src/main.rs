@@ -14,14 +14,16 @@ fn main() {
 }
 
 fn compile() -> Result<(), CompilerError> {
-    let code = "
+    /*let code = "
         int a = (1 * (2 + 3));
         float b = -a / 5;
         print(b + 3);
         int z = 10;
         float c = a + 0.4;
+        bool b = false;
         \0
-    ";
+    ";*/
+    let code = "int abc = (1 * (2 + 3));\0";
 
     let mut lexer = Lexer::new(code);
     lexer.tokenize()?;
