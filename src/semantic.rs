@@ -22,8 +22,6 @@ impl SemanticAnalyser {
         left_type: &Primitive,
         right_type: &Primitive,
     ) -> Result<Primitive, CompilerError> {
-        // TODO change boolean compability!
-
         match (op, left_type, right_type) {
             // Addition, subtraction and multiplication return int for int operands.
             (BinOpKind::Add | BinOpKind::Sub | BinOpKind::Mult, Primitive::Int, Primitive::Int) => {
@@ -104,21 +102,6 @@ impl SemanticAnalyser {
                 pos: 0,
             }),
         }
-    }
-
-    fn check_type_declaration(
-        declared_type: &Primitive,
-        expr_type: &Primitive,
-    ) -> Result<(), CompilerError> {
-        if declared_type != expr_type {
-            return Err(CompilerError::TypeDeclaration {
-                expected: declared_type.clone(),
-                found: expr_type.clone(),
-                col: 0,
-                pos: 0,
-            });
-        }
-        Ok(())
     }
 
     fn check_expr(

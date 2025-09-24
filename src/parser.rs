@@ -1,5 +1,4 @@
 use std::f32::INFINITY;
-
 use crate::{errors::CompilerError, schemas::*};
 
 pub struct Parser {
