@@ -2,8 +2,8 @@ use crate::{errors::CompilerError, schemas::*};
 
 pub struct Lexer {
     chars: Vec<char>,
+    cur_line: usize,
     cur_col: usize,
-    cur_pos: usize,
     tokens: Vec<Token>,
 }
 
@@ -11,8 +11,8 @@ impl Lexer {
     pub fn new(program: &str) -> Self {
         Lexer {
             chars: program.chars().rev().collect(),
+            cur_line: 1,
             cur_col: 1,
-            cur_pos: 1,
             tokens: vec![],
         }
     }
@@ -24,16 +24,16 @@ impl Lexer {
     fn consume_next(&mut self) -> char {
         let cur_char = self.chars.pop().unwrap_or('\0');
         if cur_char == '\n' {
-            self.cur_col += 1;
-            self.cur_pos = 0;
+            self.cur_line += 1;
+            self.cur_col = 1;
         } else {
-            self.cur_pos += 1;
+            self.cur_col += 1;
         }
         cur_char
     }
 
     fn handle_alphanumeric(&mut self) {
-        let (start_col, start_pos) = (self.cur_col, self.cur_pos);
+        let (start_line, start_col) = (self.cur_line, self.cur_col);
 
         let mut token: String = String::new();
         loop {
@@ -48,50 +48,50 @@ impl Lexer {
         match token.as_str() {
             "int" => self.tokens.push(Token {
                 kind: TokenKind::Declare(Primitive::Int),
+                line: start_line,
                 col: start_col,
-                pos: start_pos,
             }),
             "float" => self.tokens.push(Token {
                 kind: TokenKind::Declare(Primitive::Float),
+                line: start_line,
                 col: start_col,
-                pos: start_pos,
             }),
             "bool" => self.tokens.push(Token {
                 kind: TokenKind::Declare(Primitive::Bool),
+                line: start_line,
                 col: start_col,
-                pos: start_pos,
             }),
             "print" => self.tokens.push(Token {
                 kind: TokenKind::Print,
+                line: start_line,
                 col: start_col,
-                pos: start_pos,
             }),
             "true" => self.tokens.push(Token {
                 kind: TokenKind::Literal(Literal {
                     value: "true".to_string(),
                     primitive: Primitive::Bool,
                 }),
+                line: start_line,
                 col: start_col,
-                pos: start_pos,
             }),
             "false" => self.tokens.push(Token {
                 kind: TokenKind::Literal(Literal {
                     value: "false".to_string(),
                     primitive: Primitive::Bool,
                 }),
+                line: start_line,
                 col: start_col,
-                pos: start_pos,
             }),
             _ => self.tokens.push(Token {
                 kind: TokenKind::Identifier(token),
+                line: start_line,
                 col: start_col,
-                pos: start_pos,
             }),
         }
     }
 
     fn handle_numeric(&mut self) {
-        let (start_col, start_pos) = (self.cur_col, self.cur_pos);
+        let (start_line, start_col) = (self.cur_line, self.cur_col);
 
         let mut token = String::new();
         loop {
@@ -115,102 +115,120 @@ impl Lexer {
                     primitive: Primitive::Int,
                 }
             }),
+            line: start_line,
             col: start_col,
-            pos: start_pos,
         });
     }
 
-    fn handle_boolean(&mut self) {
+    fn handle_boolean(&mut self) -> Result<(), CompilerError> {
         let token = self.consume_next();
         match token {
             '=' => match self.peek_next() {
                 '=' => {
                     self.tokens.push(Token {
                         kind: TokenKind::BinOp(BinOpKind::Eq),
+                        line: self.cur_line,
                         col: self.cur_col,
-                        pos: self.cur_pos,
                     });
                     self.consume_next();
                 }
                 _ => self.tokens.push(Token {
                     kind: TokenKind::BinOp(BinOpKind::Assign),
+                    line: self.cur_line,
                     col: self.cur_col,
-                    pos: self.cur_pos,
                 }),
             },
             '<' => match self.peek_next() {
                 '=' => {
                     self.tokens.push(Token {
                         kind: TokenKind::BinOp(BinOpKind::Le),
+                        line: self.cur_line,
                         col: self.cur_col,
-                        pos: self.cur_pos,
                     });
                     self.consume_next();
                 }
                 _ => self.tokens.push(Token {
                     kind: TokenKind::BinOp(BinOpKind::Lt),
+                    line: self.cur_line,
                     col: self.cur_col,
-                    pos: self.cur_pos,
                 }),
             },
-            '>' => {
-                match self.peek_next() {
-                    '=' => {
-                        self.tokens.push(Token {
-                            kind: TokenKind::BinOp(BinOpKind::Ge),
-                            col: self.cur_col,
-                            pos: self.cur_pos,
-                        });
-                        self.consume_next();
-                    }
-                    _ => self.tokens.push(Token {
-                        kind: TokenKind::BinOp(BinOpKind::Gt),
+            '>' => match self.peek_next() {
+                '=' => {
+                    self.tokens.push(Token {
+                        kind: TokenKind::BinOp(BinOpKind::Ge),
+                        line: self.cur_line,
                         col: self.cur_col,
-                        pos: self.cur_pos,
-                    }),
+                    });
+                    self.consume_next();
                 }
-            }
+                _ => self.tokens.push(Token {
+                    kind: TokenKind::BinOp(BinOpKind::Gt),
+                    line: self.cur_line,
+                    col: self.cur_col,
+                }),
+            },
             '&' => match self.peek_next() {
                 '&' => {
                     self.tokens.push(Token {
                         kind: TokenKind::BinOp(BinOpKind::And),
+                        line: self.cur_line,
                         col: self.cur_col,
-                        pos: self.cur_pos,
                     });
                     self.consume_next();
                 }
-                _ => panic!("Unexpected single character '&', did you mean '&&'?"),
+                _ => {
+                    return Err(CompilerError::SyntaxError {
+                        message: "Unexpected single character '&', did you mean '&&'?".to_string(),
+                        line: self.cur_line,
+                        col: self.cur_col,
+                    });
+                }
             },
             '|' => match self.peek_next() {
                 '|' => {
                     self.tokens.push(Token {
                         kind: TokenKind::BinOp(BinOpKind::Or),
+                        line: self.cur_line,
                         col: self.cur_col,
-                        pos: self.cur_pos,
                     });
                     self.consume_next();
                 }
-                _ => panic!("Unexpected single character '|', did you mean '||'?"),
+                _ => {
+                    return Err(CompilerError::SyntaxError {
+                        message: "Unexpected single character '|', did you mean '||'?".to_string(),
+                        line: self.cur_line,
+                        col: self.cur_col,
+                    });
+                }
             },
             '!' => {
                 match self.peek_next() {
                     '=' => {
                         self.tokens.push(Token {
                             kind: TokenKind::BinOp(BinOpKind::Ne),
+                            line: self.cur_line,
                             col: self.cur_col,
-                            pos: self.cur_pos,
                         });
                         self.consume_next();
                     }
                     _ => self.tokens.push(Token {
                         kind: TokenKind::BinOp(BinOpKind::Not),
+                        line: self.cur_line,
                         col: self.cur_col,
-                        pos: self.cur_pos,
                     }),
                 };
             }
-            t => panic!("Ahh {}", t),
+            t => {
+                return Err(CompilerError::SyntaxError {
+                    message: format!("Unexpected character '{}'.", t),
+                    line: self.cur_line,
+                    col: self.cur_col,
+                });
+            }
         }
+
+        Ok(())
     }
 
     pub fn tokenize(&mut self) -> Result<(), CompilerError> {
@@ -228,49 +246,51 @@ impl Lexer {
                     continue;
                 }
                 '<' | '>' | '=' | '&' | '!' | '|' => {
-                    self.handle_boolean();
-                    continue;
+                    match self.handle_boolean() {
+                        Ok(_) => continue,
+                        Err(err) => return Err(err),
+                    }
                 }
                 '+' => self.tokens.push(Token {
                     kind: TokenKind::BinOp(BinOpKind::Add),
+                    line: self.cur_line,
                     col: self.cur_col,
-                    pos: self.cur_pos,
                 }),
                 '-' => self.tokens.push(Token {
                     kind: TokenKind::BinOp(BinOpKind::Sub),
+                    line: self.cur_line,
                     col: self.cur_col,
-                    pos: self.cur_pos,
                 }),
                 '*' => self.tokens.push(Token {
                     kind: TokenKind::BinOp(BinOpKind::Mult),
+                    line: self.cur_line,
                     col: self.cur_col,
-                    pos: self.cur_pos,
                 }),
                 '/' => self.tokens.push(Token {
                     kind: TokenKind::BinOp(BinOpKind::Div),
+                    line: self.cur_line,
                     col: self.cur_col,
-                    pos: self.cur_pos,
                 }),
                 '(' => self.tokens.push(Token {
                     kind: TokenKind::LParen,
+                    line: self.cur_line,
                     col: self.cur_col,
-                    pos: self.cur_pos,
                 }),
                 ')' => self.tokens.push(Token {
                     kind: TokenKind::RParen,
+                    line: self.cur_line,
                     col: self.cur_col,
-                    pos: self.cur_pos,
                 }),
                 ';' => self.tokens.push(Token {
                     kind: TokenKind::EOS,
+                    line: self.cur_line,
                     col: self.cur_col,
-                    pos: self.cur_pos,
                 }),
                 '\0' => {
                     self.tokens.push(Token {
                         kind: TokenKind::EOF,
+                        line: self.cur_line,
                         col: self.cur_col,
-                        pos: self.cur_pos,
                     });
                     self.consume_next();
                     break;
@@ -278,8 +298,8 @@ impl Lexer {
                 _ => {
                     return Err(CompilerError::SyntaxError {
                         message: format!("Unexpected character '{}'.", cur_char),
+                        line: self.cur_line,
                         col: self.cur_col,
-                        pos: self.cur_pos,
                     });
                 }
             }

@@ -19,16 +19,16 @@ impl Parser {
     fn peek_next(&self) -> Token {
         self.tokens.last().cloned().unwrap_or(Token {
             kind: TokenKind::EOF,
+            line: 0,
             col: 0,
-            pos: 0,
         })
     }
 
     fn consume_next(&mut self) -> Token {
         self.tokens.pop().unwrap_or(Token {
             kind: TokenKind::EOF,
+            line: 0,
             col: 0,
-            pos: 0,
         })
     }
 
@@ -58,8 +58,8 @@ impl Parser {
                 if !matches!(self.peek_next().kind, TokenKind::RParen) {
                     return Err(CompilerError::SyntaxError {
                         message: "Expected closing ')'.".to_string(),
+                        line: 0,
                         col: 0,
-                        pos: 0,
                     });
                 }
                 self.consume_next();
@@ -68,8 +68,8 @@ impl Parser {
             t => {
                 return Err(CompilerError::SyntaxError {
                     message: format!("Unexpected token {:?}.", t),
+                    line: 0,
                     col: 0,
-                    pos: 0,
                 });
             }
         };
@@ -99,8 +99,8 @@ impl Parser {
                 t => {
                     return Err(CompilerError::SyntaxError {
                         message: format!("Unexpected token {:?}.", t),
+                        line: 0,
                         col: 0,
-                        pos: 0,
                     });
                 }
             };
@@ -131,8 +131,8 @@ impl Parser {
                     t => {
                         return Err(CompilerError::SyntaxError {
                             message: format!("Unexpected token {:?}.", t),
+                            line: 0,
                             col: 0,
-                            pos: 0,
                         });
                     }
                 };
@@ -142,8 +142,8 @@ impl Parser {
                 if !matches!(self.peek_next().kind, TokenKind::BinOp(BinOpKind::Assign)) {
                     return Err(CompilerError::SyntaxError {
                         message: "Expected '=' after declaration.".to_string(),
+                        line: 0,
                         col: 0,
-                        pos: 0,
                     });
                 }
                 self.consume_next();
@@ -158,8 +158,8 @@ impl Parser {
                 if !matches!(self.peek_next().kind, TokenKind::LParen) {
                     return Err(CompilerError::SyntaxError {
                         message: "Expected opening '(' after 'print' keyword.".to_string(),
+                        line: 0,
                         col: 0,
-                        pos: 0,
                     });
                 }
                 self.consume_next();
@@ -167,8 +167,8 @@ impl Parser {
                 if !matches!(self.peek_next().kind, TokenKind::RParen) {
                     return Err(CompilerError::SyntaxError {
                         message: "Expected closing ')'.".to_string(),
+                        line: 0,
                         col: 0,
-                        pos: 0,
                     });
                 }
                 self.consume_next();
@@ -177,8 +177,8 @@ impl Parser {
             }
             k => Err(CompilerError::SyntaxError {
                 message: format!("Unexpected token of kind {:?}.", k),
+                line: 0,
                 col: 0,
-                pos: 0,
             }),
         }
     }
@@ -189,8 +189,8 @@ impl Parser {
             if !matches!(self.peek_next().kind, TokenKind::EOS) {
                 return Err(CompilerError::SyntaxError {
                     message: "Expected ';' at end of expression.".to_string(),
+                    line: 0,
                     col: 0,
-                    pos: 0,
                 });
             }
 
@@ -216,10 +216,10 @@ mod tests {
 
     fn parse(input: &str) -> Result<Ast, CompilerError> {
         let mut lexer = Lexer::new(&(input.to_owned() + "\0"));
-        lexer.tokenize()?; // propagate error
+        lexer.tokenize()?;
 
         let mut parser = Parser::new(lexer.get_tokens().to_vec());
-        parser.parse()?; // propagate error
+        parser.parse()?;
 
         Ok(parser.get_tree().to_vec())
     }

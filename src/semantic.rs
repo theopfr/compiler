@@ -69,8 +69,8 @@ impl SemanticAnalyser {
                     _ => Err(CompilerError::TypeDeclarationError {
                         expected: left_type.clone(),
                         found: right_type.clone(),
+                        line: 0,
                         col: 0,
-                        pos: 0,
                     }),
                 }
             }
@@ -78,8 +78,8 @@ impl SemanticAnalyser {
                 op: op.clone(),
                 left: left_type.clone(),
                 right: right_type.clone(),
+                line: 0,
                 col: 0,
-                pos: 0,
             }),
         }
     }
@@ -98,8 +98,8 @@ impl SemanticAnalyser {
             _ => Err(CompilerError::TypeUnaryOpError {
                 op: op.clone(),
                 operand: operand_type.clone(),
+                line: 0,
                 col: 0,
-                pos: 0,
             }),
         }
     }
@@ -116,8 +116,8 @@ impl SemanticAnalyser {
                 Some(identifier) => return Ok(identifier.primitive.clone()),
                 None => Err(CompilerError::NameError {
                     name: ident_name.to_string(),
+                    line: 0,
                     col: 0,
-                    pos: 0,
                 }),
             },
             Expr::BinOp { op, left, right } => {

@@ -5,91 +5,91 @@ use std::fmt;
 pub enum CompilerError {
     SyntaxError {
         message: String,
+        line: usize,
         col: usize,
-        pos: usize,
     },
     TypeDeclarationError {
         expected: Primitive,
         found: Primitive,
+        line: usize,
         col: usize,
-        pos: usize,
     },
     TypeBinOpError {
         op: BinOpKind,
         left: Primitive,
         right: Primitive,
+        line: usize,
         col: usize,
-        pos: usize,
     },
     TypeUnaryOpError {
         op: UnaryOpKind,
         operand: Primitive,
+        line: usize,
         col: usize,
-        pos: usize,
     },
     NameError {
         name: String,
+        line: usize,
         col: usize,
-        pos: usize,
     },
 }
 
 impl fmt::Display for CompilerError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            CompilerError::SyntaxError { message, col, pos } => {
+            CompilerError::SyntaxError { message, line, col } => {
                 write!(
                     f,
                     "SyntaxError (line {}, position {}): {}",
-                    col, pos, message
+                    line, col, message
                 )
             }
             CompilerError::TypeDeclarationError {
                 expected,
                 found,
+                line,
                 col,
-                pos,
             } => {
                 write!(
                     f,
                     "TypeError (line {}, position {}): Expected '{:?}', found '{:?}'.",
-                    col, pos, expected, found
+                    line, col, expected, found
                 )
             }
             CompilerError::TypeBinOpError {
                 op,
                 left,
                 right,
+                line,
                 col,
-                pos,
             } => {
                 write!(
                     f,
                     "TypeError (line {}, position {}): Cannot apply binary operation '{:?}' to '{:?}' and '{:?}'.",
-                    col, pos, op, left, right
+                    line, col, op, left, right
                 )
             }
             CompilerError::TypeUnaryOpError {
                 op,
                 operand,
+                line,
                 col,
-                pos,
             } => {
                 write!(
                     f,
                     "TypeError (line {}, position {}): Cannot apply unary operation '{:?}' to '{:?}''.",
-                    col, pos, op, operand
+                    line, col, op, operand
                 )
             }
             CompilerError::NameError {
                 name,
+                line,
                 col,
-                pos,
             } => {
                 write!(
                     f,
                     "NameError (line {}, position {}): Cannot find identifier '{}'.",
-                    col, pos, name
+                    line, col, name
                 )
             },
         }

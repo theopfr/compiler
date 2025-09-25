@@ -27,7 +27,10 @@ fn compile() -> Result<(), CompilerError> {
             \0
         ";*/
 
-    let code = "bool a=true||b>=4&&c==d!=e;\0";
+    let code = 
+"bool b = true & false;
+int a = 2\0"
+    ;
 
     let mut lexer = Lexer::new(code);
     lexer.tokenize()?;
