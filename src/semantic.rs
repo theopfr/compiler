@@ -39,9 +39,11 @@ impl SemanticAnalyser {
             ) => Ok(Primitive::Float),
 
             // Boolean operation on bool operands return bool.
-            (BinOpKind::And | BinOpKind::Or | BinOpKind::Not | BinOpKind::Eq | BinOpKind::Ne, Primitive::Bool, Primitive::Bool) => {
-                Ok(Primitive::Bool)
-            }
+            (
+                BinOpKind::And | BinOpKind::Or | BinOpKind::Not | BinOpKind::Eq | BinOpKind::Ne,
+                Primitive::Bool,
+                Primitive::Bool,
+            ) => Ok(Primitive::Bool),
 
             // Comparison operations on int and float return bool.
             (
@@ -64,7 +66,7 @@ impl SemanticAnalyser {
                     (Primitive::Int, Primitive::Int | Primitive::Float) => Ok(Primitive::Int),
                     (Primitive::Float, Primitive::Int | Primitive::Float) => Ok(Primitive::Float),
                     (Primitive::Bool, Primitive::Bool) => Ok(Primitive::Bool),
-                    _ => Err(CompilerError::TypeDeclaration {
+                    _ => Err(CompilerError::TypeDeclarationError {
                         expected: left_type.clone(),
                         found: right_type.clone(),
                         col: 0,
@@ -72,7 +74,7 @@ impl SemanticAnalyser {
                     }),
                 }
             }
-            _ => Err(CompilerError::TypeBinOp {
+            _ => Err(CompilerError::TypeBinOpError {
                 op: op.clone(),
                 left: left_type.clone(),
                 right: right_type.clone(),
@@ -88,14 +90,12 @@ impl SemanticAnalyser {
     ) -> Result<Primitive, CompilerError> {
         match (op, operand_type) {
             // Unary negation (-) only valid on int or float
-            (UnaryOpKind::Neg, Primitive::Int | Primitive::Float) => {
-                Ok(operand_type.clone())
-            }
+            (UnaryOpKind::Neg, Primitive::Int | Primitive::Float) => Ok(operand_type.clone()),
 
             // Logical not (!) only valid on bool
             (UnaryOpKind::Not, Primitive::Bool) => Ok(Primitive::Bool),
 
-            _ => Err(CompilerError::TypeUnaryOp {
+            _ => Err(CompilerError::TypeUnaryOpError {
                 op: op.clone(),
                 operand: operand_type.clone(),
                 col: 0,
@@ -114,7 +114,7 @@ impl SemanticAnalyser {
             }
             Expr::Identifier(ident_name) => match symbol_table.get(ident_name) {
                 Some(identifier) => return Ok(identifier.primitive.clone()),
-                None => Err(CompilerError::Name {
+                None => Err(CompilerError::NameError {
                     name: ident_name.to_string(),
                     col: 0,
                     pos: 0,
@@ -135,7 +135,7 @@ impl SemanticAnalyser {
                     Ok(infered_type) => Ok(infered_type),
                     Err(err) => Err(err),
                 }
-            },
+            }
         }
     }
 
@@ -176,5 +176,133 @@ impl SemanticAnalyser {
 
     pub fn get_symbol_table(&self) -> &HashMap<String, Identifier> {
         return &self.symbol_table;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{lexer::Lexer, parser::Parser};
+
+    fn check(input: &str) -> Result<(), CompilerError> {
+        let mut lexer = Lexer::new(&(input.to_owned() + "\0"));
+        lexer.tokenize()?;
+
+        let mut parser = Parser::new(lexer.get_tokens().to_vec());
+        parser.parse()?;
+        let mut parser = SemanticAnalyser::new(parser.get_tree().to_vec());
+        parser.check()?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_correct_program_analysis() {
+        check(
+            "
+            int a = (1 * (2 + 3));
+            float b = -a / 5;
+            print(b + 3);
+            float c = 0.00001;
+            float d = a + c;
+            float e = a;
+            bool b1 = 2 == 2;
+            bool b2 = !(true && (2 > 0.5)) || b1 != (e <= 200);
+            print(true && b2);
+            \0
+        ",
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn test_assigning_float_to_int_var() {
+        check("int a = 0.5;\0").unwrap();
+    }
+
+    #[test]
+    fn test_assigning_int_to_float_var() {
+        check("float a = 200;\0").unwrap();
+    }
+
+    #[test]
+    fn test_arithm_binop_between_int_and_float() {
+        check("int a = 0.5 * -200;\0").unwrap();
+        check("float a = 0.5 * -200;\0").unwrap();
+    }
+
+    #[test]
+    fn test_assigning_bool_to_int_and_float_var() {
+        let result = check("int a = 200 == 200;\0");
+        assert!(matches!(result, Err(CompilerError::TypeDeclarationError { .. })));
+
+        let result = check("float b = !false;\0");
+        assert!(matches!(result, Err(CompilerError::TypeDeclarationError { .. })));
+    }
+
+    #[test]
+    fn test_assigning_int_and_float_to_bool_var() {
+        let result = check("bool b = 200 - 200;\0");
+        assert!(matches!(result, Err(CompilerError::TypeDeclarationError { .. })));
+
+        let result = check("bool b = 0.02;\0");
+        assert!(matches!(result, Err(CompilerError::TypeDeclarationError { .. })));
+    }
+
+    #[test]
+    fn test_numeric_comparison_binop() {
+        check("
+            bool a = 0.5 > -200;
+            bool b = !(10 == 11);
+            bool c = 10 <= 11;
+            bool d = 10 != 11;
+            \0
+        ").unwrap();
+    }
+
+    #[test]
+    fn test_boolean_comparison_binop() {
+        check("
+            bool a = true == true;
+            bool b = true != false;
+            \0
+        ").unwrap();
+    }
+
+    #[test]
+    fn test_boolean_binop_between_bool_and_int() {
+        let result = check("int a = 1 && true;\0");
+        assert!(matches!(result, Err(CompilerError::TypeBinOpError { .. })));
+
+        let result = check("bool b = 1 != true;\0");
+        assert!(matches!(result, Err(CompilerError::TypeBinOpError { .. })));
+
+        let result = check("int a = false || 4;\0");
+        assert!(matches!(result, Err(CompilerError::TypeBinOpError { .. })));
+    }
+
+    #[test]
+    fn test_cmp_binop_between_bool_and_int() {
+        let result = check("int a = 1 > true;\0");
+        assert!(matches!(result, Err(CompilerError::TypeBinOpError { .. })));
+
+        let result = check("bool b = 1 != (true <= false);\0");
+        assert!(matches!(result, Err(CompilerError::TypeBinOpError { .. })));
+    }
+
+    #[test]
+    fn test_arithm_unaryop() {
+        check("int a = -2 * +-+-+(-+-4.0);\0").unwrap();
+
+        let result = check("bool a = -false;\0");
+        assert!(matches!(result, Err(CompilerError::TypeUnaryOpError { .. })));
+    }
+
+    #[test]
+    fn test_boolean_unaryop() {
+        check("bool b = !true && !!(!!false);\0").unwrap();
+
+        let result = check("int a = 200;int b = !a;\0");
+        assert!(matches!(result, Err(CompilerError::TypeUnaryOpError { .. })));
     }
 }

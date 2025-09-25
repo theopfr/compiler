@@ -54,7 +54,7 @@ impl Parser {
             TokenKind::LParen => {
                 let expr = self.parse_expression(0.0)?;
                 if !matches!(self.peek_next().kind, TokenKind::RParen) {
-                    return Err(CompilerError::Syntax {
+                    return Err(CompilerError::SyntaxError {
                         message: "Expected closing ')'.".to_string(),
                         col: 0,
                         pos: 0,
@@ -64,7 +64,7 @@ impl Parser {
                 expr
             }
             t => {
-                return Err(CompilerError::Syntax {
+                return Err(CompilerError::SyntaxError {
                     message: format!("Unexpected token {:?}.", t),
                     col: 0,
                     pos: 0,
@@ -95,7 +95,7 @@ impl Parser {
                 TokenKind::EOF => break,
                 TokenKind::RParen => break,
                 t => {
-                    return Err(CompilerError::Syntax {
+                    return Err(CompilerError::SyntaxError {
                         message: format!("Unexpected token {:?}.", t),
                         col: 0,
                         pos: 0,
@@ -127,7 +127,7 @@ impl Parser {
                 let identifer_name = match self.peek_next().clone().kind {
                     TokenKind::Identifier(name) => name,
                     t => {
-                        return Err(CompilerError::Syntax {
+                        return Err(CompilerError::SyntaxError {
                             message: format!("Unexpected token {:?}.", t),
                             col: 0,
                             pos: 0,
@@ -138,7 +138,7 @@ impl Parser {
 
                 // Check for assign token (ie. '=')
                 if !matches!(self.peek_next().kind, TokenKind::BinOp(BinOpKind::Assign)) {
-                    return Err(CompilerError::Syntax {
+                    return Err(CompilerError::SyntaxError {
                         message: "Expected '=' after declaration.".to_string(),
                         col: 0,
                         pos: 0,
@@ -154,7 +154,7 @@ impl Parser {
             }
             TokenKind::Print => {
                 if !matches!(self.peek_next().kind, TokenKind::LParen) {
-                    return Err(CompilerError::Syntax {
+                    return Err(CompilerError::SyntaxError {
                         message: "Expected opening '(' after 'print' keyword.".to_string(),
                         col: 0,
                         pos: 0,
@@ -163,7 +163,7 @@ impl Parser {
                 self.consume_next();
                 let expr = self.parse_expression(0.0)?;
                 if !matches!(self.peek_next().kind, TokenKind::RParen) {
-                    return Err(CompilerError::Syntax {
+                    return Err(CompilerError::SyntaxError {
                         message: "Expected closing ')'.".to_string(),
                         col: 0,
                         pos: 0,
@@ -173,7 +173,7 @@ impl Parser {
 
                 Ok(Stmt::Print { expr })
             }
-            k => Err(CompilerError::Syntax {
+            k => Err(CompilerError::SyntaxError {
                 message: format!("Unexpected token of kind {:?}.", k),
                 col: 0,
                 pos: 0,
@@ -185,7 +185,7 @@ impl Parser {
         while !matches!(self.peek_next().kind, TokenKind::EOF) {
             let stmt = self.parse_statement()?;
             if !matches!(self.peek_next().kind, TokenKind::EOS) {
-                return Err(CompilerError::Syntax {
+                return Err(CompilerError::SyntaxError {
                     message: "Expected ';' at end of expression.".to_string(),
                     col: 0,
                     pos: 0,
@@ -525,6 +525,12 @@ mod tests {
     #[test]
     fn test_missing_eos_semicolon() {
         let result = parse("int a = 0 print(a);");
-        assert!(matches!(result, Err(CompilerError::Syntax { .. })));
+        assert!(matches!(result, Err(CompilerError::SyntaxError { .. })));
+    }
+
+    #[test]
+    fn test_missing_closing_parenthese() {
+        let result = parse("int a = ((5 + 4) / 4;");
+        assert!(matches!(result, Err(CompilerError::SyntaxError { .. })));
     }
 }

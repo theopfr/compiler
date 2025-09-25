@@ -3,31 +3,31 @@ use std::fmt;
 
 #[derive(Debug)]
 pub enum CompilerError {
-    Syntax {
+    SyntaxError {
         message: String,
         col: u32,
         pos: u32,
     },
-    TypeDeclaration {
+    TypeDeclarationError {
         expected: Primitive,
         found: Primitive,
         col: u32,
         pos: u32,
     },
-    TypeBinOp {
+    TypeBinOpError {
         op: BinOpKind,
         left: Primitive,
         right: Primitive,
         col: u32,
         pos: u32,
     },
-    TypeUnaryOp {
+    TypeUnaryOpError {
         op: UnaryOpKind,
         operand: Primitive,
         col: u32,
         pos: u32,
     },
-    Name {
+    NameError {
         name: String,
         col: u32,
         pos: u32,
@@ -37,14 +37,14 @@ pub enum CompilerError {
 impl fmt::Display for CompilerError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            CompilerError::Syntax { message, col, pos } => {
+            CompilerError::SyntaxError { message, col, pos } => {
                 write!(
                     f,
                     "SyntaxError (line {}, position {}): {}",
                     col, pos, message
                 )
             }
-            CompilerError::TypeDeclaration {
+            CompilerError::TypeDeclarationError {
                 expected,
                 found,
                 col,
@@ -56,7 +56,7 @@ impl fmt::Display for CompilerError {
                     col, pos, expected, found
                 )
             }
-            CompilerError::TypeBinOp {
+            CompilerError::TypeBinOpError {
                 op,
                 left,
                 right,
@@ -65,11 +65,11 @@ impl fmt::Display for CompilerError {
             } => {
                 write!(
                     f,
-                    "TypeError (line {}, position {}): Cannot binary apply {:?} to '{:?}' and '{:?}'.",
+                    "TypeError (line {}, position {}): Cannot apply binary operation '{:?}' to '{:?}' and '{:?}'.",
                     col, pos, op, left, right
                 )
             }
-            CompilerError::TypeUnaryOp {
+            CompilerError::TypeUnaryOpError {
                 op,
                 operand,
                 col,
@@ -81,7 +81,7 @@ impl fmt::Display for CompilerError {
                     col, pos, op, operand
                 )
             }
-            CompilerError::Name {
+            CompilerError::NameError {
                 name,
                 col,
                 pos,

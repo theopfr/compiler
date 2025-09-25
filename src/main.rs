@@ -14,21 +14,18 @@ fn main() {
 }
 
 fn compile() -> Result<(), CompilerError> {
-    /*let code = "
-        int a = (1 * (2 + 3));
-        float b = -a / 5;
-        print(b + 3);
-        int z = 10;
-        float c = a + 0.4;
-        bool b = 2 == 2;
-        bool u = true == 2;
-        \0
-    ";*/
     let code = "
-        bool a = !!!true;
-        bool b = (-2 > +3) == a;
-        \0
-    ";
+            int a = (1 * (2 + 3));
+            float b = -a / 5;
+            print(b + 3);
+            float c = 0.00001;
+            float d = a + c;
+            float e = a;
+            bool b1 = 2 == 2;
+            bool b2 = !(true && (2 > 0.5)) || (d != e) && (10 <= 200);
+            print(true && b2);
+            \0
+        ";
 
     let mut lexer = Lexer::new(code);
     lexer.tokenize()?;

@@ -1,5 +1,3 @@
-use std::str::Chars;
-
 use crate::{errors::CompilerError, schemas::*};
 
 pub struct Lexer {
@@ -239,7 +237,7 @@ impl Lexer {
                     break;
                 }
                 _ => {
-                    return Err(CompilerError::Syntax {
+                    return Err(CompilerError::SyntaxError {
                         message: format!("Unexpected character '{}'.", cur_char),
                         col: 0,
                         pos: 0,
@@ -520,6 +518,6 @@ mod tests {
     #[test]
     fn test_invalid_character() {
         let result = tokenize("int a = 5 $ 2;");
-        assert!(matches!(result, Err(CompilerError::Syntax { .. })));
+        assert!(matches!(result, Err(CompilerError::SyntaxError { .. })));
     }
 }
