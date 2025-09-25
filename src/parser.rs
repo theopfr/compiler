@@ -19,14 +19,16 @@ impl Parser {
     fn peek_next(&self) -> Token {
         self.tokens.last().cloned().unwrap_or(Token {
             kind: TokenKind::EOF,
-            pos: self.tokens.len(),
+            col: 0,
+            pos: 0,
         })
     }
 
     fn consume_next(&mut self) -> Token {
         self.tokens.pop().unwrap_or(Token {
             kind: TokenKind::EOF,
-            pos: self.tokens.len(),
+            col: 0,
+            pos: 0,
         })
     }
 
@@ -517,6 +519,77 @@ mod tests {
                             right: Box::new(Expr::Identifier("e".to_string())),
                         })
                     })
+                }
+            }]
+        );
+    }
+
+    #[test]
+    fn test_bool_expr_without_whitespaces() {
+        let ast = parse("bool a=true||b>=4&&c==d!=e;").unwrap();
+        assert_eq!(
+            ast,
+            [Stmt::Declare {
+                dtype: Primitive::Bool,
+                name: "a".to_string(),
+                expr: Expr::BinOp {
+                    op: BinOpKind::Or,
+                    left: Box::new(Expr::Literal(Literal {
+                        value: "true".to_string(),
+                        primitive: Primitive::Bool
+                    })),
+                    right: Box::new(Expr::BinOp {
+                        op: BinOpKind::And,
+                        left: Box::new(Expr::BinOp {
+                            op: BinOpKind::Ge,
+                            left: Box::new(Expr::Identifier("b".to_string())),
+                            right: Box::new(Expr::Literal(Literal {
+                                value: "4".to_string(),
+                                primitive: Primitive::Int
+                            })),
+                        }),
+                        right: Box::new(Expr::BinOp {
+                            op: BinOpKind::Ne,
+                            left: Box::new(Expr::BinOp {
+                                op: BinOpKind::Eq,
+                                left: Box::new(Expr::Identifier("c".to_string())),
+                                right: Box::new(Expr::Identifier("d".to_string())),
+                            }),
+                            right: Box::new(Expr::Identifier("e".to_string())),
+                        })
+                    })
+                }
+            }]
+        );
+    }
+
+    #[test]
+    fn test_arithm_expr_without_whitespaces() {
+        let ast = parse("float c=((1+a)*b)/(a-b);").unwrap();
+        assert_eq!(
+            ast,
+            [Stmt::Declare {
+                dtype: Primitive::Float,
+                name: "c".to_string(),
+                expr: Expr::BinOp {
+                    op: BinOpKind::Div,
+                    left: Box::new(Expr::BinOp {
+                        op: BinOpKind::Mult,
+                        left: Box::new(Expr::BinOp {
+                            op: BinOpKind::Add,
+                            left: Box::new(Expr::Literal(Literal {
+                                value: "1".to_string(),
+                                primitive: Primitive::Int
+                            })),
+                            right: Box::new(Expr::Identifier("a".to_string())),
+                        }),
+                        right: Box::new(Expr::Identifier("b".to_string())),
+                    }),
+                    right: Box::new(Expr::BinOp {
+                        op: BinOpKind::Sub,
+                        left: Box::new(Expr::Identifier("a".to_string())),
+                        right: Box::new(Expr::Identifier("b".to_string())),
+                    }),
                 }
             }]
         );

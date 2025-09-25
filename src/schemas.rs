@@ -1,6 +1,5 @@
 #[derive(Debug, PartialEq, Clone)]
 
-
 pub enum Primitive {
     Int,
     Float,
@@ -36,6 +35,7 @@ pub enum TokenKind {
 #[derive(Clone, Debug)]
 pub struct Token {
     pub kind: TokenKind,
+    pub col: usize,
     pub pos: usize,
 }
 

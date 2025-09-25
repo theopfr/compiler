@@ -5,32 +5,32 @@ use std::fmt;
 pub enum CompilerError {
     SyntaxError {
         message: String,
-        col: u32,
-        pos: u32,
+        col: usize,
+        pos: usize,
     },
     TypeDeclarationError {
         expected: Primitive,
         found: Primitive,
-        col: u32,
-        pos: u32,
+        col: usize,
+        pos: usize,
     },
     TypeBinOpError {
         op: BinOpKind,
         left: Primitive,
         right: Primitive,
-        col: u32,
-        pos: u32,
+        col: usize,
+        pos: usize,
     },
     TypeUnaryOpError {
         op: UnaryOpKind,
         operand: Primitive,
-        col: u32,
-        pos: u32,
+        col: usize,
+        pos: usize,
     },
     NameError {
         name: String,
-        col: u32,
-        pos: u32,
+        col: usize,
+        pos: usize,
     },
 }
 
