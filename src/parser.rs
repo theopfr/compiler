@@ -33,7 +33,8 @@ impl Parser {
     }
 
     fn parse_expression(&mut self, min_binding_pow: f32) -> Result<Expr, CompilerError> {
-        let mut lhs = match &self.consume_next().kind {
+        let cur_token = self.consume_next();
+        let mut lhs = match cur_token.kind {
             TokenKind::Literal(literal) => Expr::Literal(literal.clone()),
             TokenKind::Identifier(name) => Expr::Identifier(name.to_string()),
 
@@ -55,11 +56,13 @@ impl Parser {
             // Handle expression in parentheses.
             TokenKind::LParen => {
                 let expr = self.parse_expression(0.0)?;
-                if !matches!(self.peek_next().kind, TokenKind::RParen) {
+
+                let next_token = self.peek_next();
+                if !matches!(next_token.kind, TokenKind::RParen) {
                     return Err(CompilerError::SyntaxError {
                         message: "Expected closing ')'.".to_string(),
-                        line: 0,
-                        col: 0,
+                        line: next_token.line,
+                        col: next_token.col,
                     });
                 }
                 self.consume_next();
@@ -68,16 +71,16 @@ impl Parser {
             t => {
                 return Err(CompilerError::SyntaxError {
                     message: format!("Unexpected token {:?}.", t),
-                    line: 0,
-                    col: 0,
+                    line: cur_token.line,
+                    col: cur_token.col,
                 });
             }
         };
 
         loop {
-            let next_op = self.peek_next();
+            let next_op_token = self.peek_next();
 
-            match &next_op.kind {
+            match &next_op_token.kind {
                 TokenKind::BinOp(op) => {
                     let (lbp, rbp) = Self::airthmetic_binding_power(&op);
                     if lbp < min_binding_pow {
@@ -99,8 +102,8 @@ impl Parser {
                 t => {
                     return Err(CompilerError::SyntaxError {
                         message: format!("Unexpected token {:?}.", t),
-                        line: 0,
-                        col: 0,
+                        line: next_op_token.line,
+                        col: next_op_token.col,
                     });
                 }
             };
@@ -123,27 +126,33 @@ impl Parser {
     }
 
     fn parse_statement(&mut self) -> Result<Stmt, CompilerError> {
-        match self.consume_next().clone().kind {
+        let cur_token = self.consume_next().clone();
+        match cur_token.kind {
+
             TokenKind::Declare(ref primitive) => {
+                let next_token = self.peek_next().clone();
+
                 // Check for identifier (ie. variable name)
-                let identifer_name = match self.peek_next().clone().kind {
+                let identifer_name = match next_token.kind {
                     TokenKind::Identifier(name) => name,
                     t => {
                         return Err(CompilerError::SyntaxError {
                             message: format!("Unexpected token {:?}.", t),
-                            line: 0,
-                            col: 0,
+                            line: next_token.line,
+                            col: next_token.col,
                         });
                     }
                 };
                 self.consume_next();
 
+                let next_token = self.peek_next();
+                
                 // Check for assign token (ie. '=')
-                if !matches!(self.peek_next().kind, TokenKind::BinOp(BinOpKind::Assign)) {
+                if !matches!(next_token.kind, TokenKind::BinOp(BinOpKind::Assign)) {
                     return Err(CompilerError::SyntaxError {
                         message: "Expected '=' after declaration.".to_string(),
-                        line: 0,
-                        col: 0,
+                        line: next_token.line,
+                        col: next_token.col
                     });
                 }
                 self.consume_next();
@@ -155,20 +164,27 @@ impl Parser {
                 })
             }
             TokenKind::Print => {
-                if !matches!(self.peek_next().kind, TokenKind::LParen) {
+                // Check for opening parenthese.
+                let next_token = self.peek_next();
+                if !matches!(next_token.kind, TokenKind::LParen) {
                     return Err(CompilerError::SyntaxError {
                         message: "Expected opening '(' after 'print' keyword.".to_string(),
-                        line: 0,
-                        col: 0,
+                        line: next_token.line,
+                        col: next_token.col,
                     });
                 }
                 self.consume_next();
+
+                // Processes expression inside print().
                 let expr = self.parse_expression(0.0)?;
-                if !matches!(self.peek_next().kind, TokenKind::RParen) {
+
+                // Check for closing parenthese.
+                let next_token = self.peek_next();
+                if !matches!(next_token.kind, TokenKind::RParen) {
                     return Err(CompilerError::SyntaxError {
                         message: "Expected closing ')'.".to_string(),
-                        line: 0,
-                        col: 0,
+                        line: next_token.line,
+                        col: next_token.col,
                     });
                 }
                 self.consume_next();
@@ -177,8 +193,8 @@ impl Parser {
             }
             k => Err(CompilerError::SyntaxError {
                 message: format!("Unexpected token of kind {:?}.", k),
-                line: 0,
-                col: 0,
+                line: cur_token.line,
+                col: cur_token.col,
             }),
         }
     }
@@ -186,17 +202,19 @@ impl Parser {
     pub fn parse(&mut self) -> Result<(), CompilerError> {
         while !matches!(self.peek_next().kind, TokenKind::EOF) {
             let stmt = self.parse_statement()?;
-            if !matches!(self.peek_next().kind, TokenKind::EOS) {
+
+            let next_token = self.peek_next();
+            if !matches!(next_token.kind, TokenKind::EOS) {
                 return Err(CompilerError::SyntaxError {
                     message: "Expected ';' at end of expression.".to_string(),
-                    line: 0,
-                    col: 0,
+                    line: next_token.line,
+                    col: next_token.col,
                 });
             }
 
             self.tree.push(stmt);
 
-            if matches!(self.peek_next().kind, TokenKind::EOS) {
+            if matches!(next_token.kind, TokenKind::EOS) {
                 self.consume_next();
             }
         }
