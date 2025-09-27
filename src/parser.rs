@@ -1,5 +1,5 @@
-use std::f32::INFINITY;
 use crate::{errors::CompilerError, schemas::*};
+use std::f32::INFINITY;
 
 pub struct Parser {
     tokens: Vec<Token>,
@@ -19,29 +19,34 @@ impl Parser {
     fn peek_next(&self) -> Token {
         self.tokens.last().cloned().unwrap_or(Token {
             kind: TokenKind::EOF,
-            line: 0,
-            col: 0,
+            span: Span { line: 0, col: 0 },
         })
     }
 
     fn consume_next(&mut self) -> Token {
         self.tokens.pop().unwrap_or(Token {
             kind: TokenKind::EOF,
-            line: 0,
-            col: 0,
+            span: Span { line: 0, col: 0 },
         })
     }
 
     fn parse_expression(&mut self, min_binding_pow: f32) -> Result<Expr, CompilerError> {
         let cur_token = self.consume_next();
         let mut lhs = match cur_token.kind {
-            TokenKind::Literal(literal) => Expr::Literal(literal.clone()),
-            TokenKind::Identifier(name) => Expr::Identifier(name.to_string()),
+            TokenKind::Literal(literal) => Expr::Literal {
+                literal: literal.clone(),
+                span: cur_token.span,
+            },
+            TokenKind::Identifier(name) => Expr::Identifier {
+                name: name.clone(),
+                span: cur_token.span,
+            },
 
             // Handles unary '-' sign.
             TokenKind::BinOp(BinOpKind::Sub) => Expr::UnaryOp {
                 op: UnaryOpKind::Neg,
                 expr: Box::new(self.parse_expression(INFINITY)?),
+                span: cur_token.span
             },
 
             // Handle unary '-' sign.
@@ -51,6 +56,7 @@ impl Parser {
             TokenKind::BinOp(BinOpKind::Not) => Expr::UnaryOp {
                 op: UnaryOpKind::Not,
                 expr: Box::new(self.parse_expression(INFINITY)?),
+                span: cur_token.span
             },
 
             // Handle expression in parentheses.
@@ -61,8 +67,7 @@ impl Parser {
                 if !matches!(next_token.kind, TokenKind::RParen) {
                     return Err(CompilerError::SyntaxError {
                         message: "Expected closing ')'.".to_string(),
-                        line: next_token.line,
-                        col: next_token.col,
+                        span: next_token.span,
                     });
                 }
                 self.consume_next();
@@ -71,8 +76,7 @@ impl Parser {
             t => {
                 return Err(CompilerError::SyntaxError {
                     message: format!("Unexpected token {:?}.", t),
-                    line: cur_token.line,
-                    col: cur_token.col,
+                    span: cur_token.span,
                 });
             }
         };
@@ -94,6 +98,7 @@ impl Parser {
                         op: op_clone,
                         left: Box::new(lhs),
                         right: Box::new(self.parse_expression(rbp.clone())?),
+                        span: next_op_token.span
                     };
                 }
                 TokenKind::EOS => break,
@@ -102,8 +107,7 @@ impl Parser {
                 t => {
                     return Err(CompilerError::SyntaxError {
                         message: format!("Unexpected token {:?}.", t),
-                        line: next_op_token.line,
-                        col: next_op_token.col,
+                        span: next_op_token.span,
                     });
                 }
             };
@@ -128,7 +132,6 @@ impl Parser {
     fn parse_statement(&mut self) -> Result<Stmt, CompilerError> {
         let cur_token = self.consume_next().clone();
         match cur_token.kind {
-
             TokenKind::Declare(ref primitive) => {
                 let next_token = self.peek_next().clone();
 
@@ -138,21 +141,19 @@ impl Parser {
                     t => {
                         return Err(CompilerError::SyntaxError {
                             message: format!("Unexpected token {:?}.", t),
-                            line: next_token.line,
-                            col: next_token.col,
+                            span: next_token.span,
                         });
                     }
                 };
                 self.consume_next();
 
                 let next_token = self.peek_next();
-                
+
                 // Check for assign token (ie. '=')
                 if !matches!(next_token.kind, TokenKind::BinOp(BinOpKind::Assign)) {
                     return Err(CompilerError::SyntaxError {
                         message: "Expected '=' after declaration.".to_string(),
-                        line: next_token.line,
-                        col: next_token.col
+                        span: next_token.span,
                     });
                 }
                 self.consume_next();
@@ -161,6 +162,10 @@ impl Parser {
                     dtype: primitive.clone(),
                     name: identifer_name.clone(),
                     expr: self.parse_expression(0.0)?,
+                    span: Span {
+                        line: cur_token.span.line,
+                        col: cur_token.span.col,
+                    },
                 })
             }
             TokenKind::Print => {
@@ -169,8 +174,7 @@ impl Parser {
                 if !matches!(next_token.kind, TokenKind::LParen) {
                     return Err(CompilerError::SyntaxError {
                         message: "Expected opening '(' after 'print' keyword.".to_string(),
-                        line: next_token.line,
-                        col: next_token.col,
+                        span: next_token.span,
                     });
                 }
                 self.consume_next();
@@ -183,18 +187,22 @@ impl Parser {
                 if !matches!(next_token.kind, TokenKind::RParen) {
                     return Err(CompilerError::SyntaxError {
                         message: "Expected closing ')'.".to_string(),
-                        line: next_token.line,
-                        col: next_token.col,
+                        span: next_token.span,
                     });
                 }
                 self.consume_next();
 
-                Ok(Stmt::Print { expr })
+                Ok(Stmt::Print {
+                    expr,
+                    span: Span {
+                        line: cur_token.span.line,
+                        col: cur_token.span.col,
+                    },
+                })
             }
             k => Err(CompilerError::SyntaxError {
                 message: format!("Unexpected token of kind {:?}.", k),
-                line: cur_token.line,
-                col: cur_token.col,
+                span: cur_token.span,
             }),
         }
     }
@@ -207,8 +215,7 @@ impl Parser {
             if !matches!(next_token.kind, TokenKind::EOS) {
                 return Err(CompilerError::SyntaxError {
                     message: "Expected ';' at end of expression.".to_string(),
-                    line: next_token.line,
-                    col: next_token.col,
+                    span: next_token.span,
                 });
             }
 
@@ -242,25 +249,81 @@ mod tests {
         Ok(parser.get_tree().to_vec())
     }
 
+    fn ignore_spans_expr(expr: Expr) -> Expr {
+        match expr {
+            Expr::Literal { literal, .. } => Expr::Literal {
+                literal,
+                span: Span::default(),
+            },
+            Expr::Identifier { name, .. } => Expr::Identifier {
+                name,
+                span: Span::default(),
+            },
+            Expr::UnaryOp { op, expr, span: _ } => Expr::UnaryOp {
+                op,
+                expr: Box::new(ignore_spans_expr(*expr)),
+                span: Span::default(),
+            },
+            Expr::BinOp { op, left, right, span: _ } => Expr::BinOp {
+                op,
+                left: Box::new(ignore_spans_expr(*left)),
+                right: Box::new(ignore_spans_expr(*right)),
+                span: Span::default(),
+            },
+        }
+    }
+
+    fn ignore_spans_stmt(stmt: Stmt) -> Stmt {
+        match stmt {
+            Stmt::Declare {
+                dtype,
+                name,
+                expr,
+                span: _,
+            } => Stmt::Declare {
+                dtype,
+                name,
+                expr: ignore_spans_expr(expr),
+                span: Span::default(),
+            },
+            Stmt::Print { expr, span: _ } => Stmt::Print {
+                expr: ignore_spans_expr(expr),
+                span: Span::default(),
+            },
+        }
+    }
+
+    fn ignore_spans_ast(ast: Ast) -> Ast {
+        ast.into_iter().map(ignore_spans_stmt).collect()
+    }
+
     #[test]
     fn test_simple_statement() {
         let ast = parse("int a = 1 + 2;").unwrap();
         assert_eq!(
-            ast,
+            ignore_spans_ast(ast),
             [Stmt::Declare {
                 dtype: Primitive::Int,
                 name: "a".to_string(),
                 expr: Expr::BinOp {
                     op: BinOpKind::Add,
-                    left: Box::new(Expr::Literal(Literal {
-                        value: "1".to_string(),
-                        primitive: Primitive::Int
-                    })),
-                    right: Box::new(Expr::Literal(Literal {
-                        value: "2".to_string(),
-                        primitive: Primitive::Int
-                    }))
-                }
+                    left: Box::new(Expr::Literal {
+                        literal: Literal {
+                            value: "1".to_string(),
+                            primitive: Primitive::Int
+                        },
+                        span: Span::default()
+                    }),
+                    right: Box::new(Expr::Literal {
+                        literal: Literal {
+                            value: "2".to_string(),
+                            primitive: Primitive::Int
+                        },
+                        span: Span::default()
+                    }),
+                    span: Span::default()
+                },
+                span: Span::default()
             }]
         );
     }
@@ -269,7 +332,7 @@ mod tests {
     fn test_left_side_precedence() {
         let ast = parse("float a = 1 * 2 + 3.5;").unwrap();
         assert_eq!(
-            ast,
+            ignore_spans_ast(ast),
             [Stmt::Declare {
                 dtype: Primitive::Float,
                 name: "a".to_string(),
@@ -277,20 +340,32 @@ mod tests {
                     op: BinOpKind::Add,
                     left: Box::new(Expr::BinOp {
                         op: BinOpKind::Mult,
-                        left: Box::new(Expr::Literal(Literal {
-                            value: "1".to_string(),
-                            primitive: Primitive::Int
-                        })),
-                        right: Box::new(Expr::Literal(Literal {
-                            value: "2".to_string(),
-                            primitive: Primitive::Int
-                        }))
+                        left: Box::new(Expr::Literal {
+                            literal: Literal {
+                                value: "1".to_string(),
+                                primitive: Primitive::Int
+                            },
+                            span: Span::default()
+                        }),
+                        right: Box::new(Expr::Literal {
+                            literal: Literal {
+                                value: "2".to_string(),
+                                primitive: Primitive::Int
+                            },
+                            span: Span::default()
+                        }),
+                        span: Span::default()
                     }),
-                    right: Box::new(Expr::Literal(Literal {
-                        value: "3.5".to_string(),
-                        primitive: Primitive::Float
-                    }))
-                }
+                    right: Box::new(Expr::Literal {
+                        literal: Literal {
+                            value: "3.5".to_string(),
+                            primitive: Primitive::Float
+                        },
+                        span: Span::default()
+                    }),
+                    span: Span::default()
+                },
+                span: Span::default()
             }]
         );
     }
@@ -299,28 +374,40 @@ mod tests {
     fn test_right_side_precedence() {
         let ast = parse("float a = 0.3333 - 2 / 3;").unwrap();
         assert_eq!(
-            ast,
+            ignore_spans_ast(ast),
             [Stmt::Declare {
                 dtype: Primitive::Float,
                 name: "a".to_string(),
                 expr: Expr::BinOp {
                     op: BinOpKind::Sub,
-                    left: Box::new(Expr::Literal(Literal {
-                        value: "0.3333".to_string(),
-                        primitive: Primitive::Float
-                    })),
+                    left: Box::new(Expr::Literal {
+                        literal: Literal {
+                            value: "0.3333".to_string(),
+                            primitive: Primitive::Float
+                        },
+                        span: Span::default()
+                    }),
                     right: Box::new(Expr::BinOp {
                         op: BinOpKind::Div,
-                        left: Box::new(Expr::Literal(Literal {
-                            value: "2".to_string(),
-                            primitive: Primitive::Int
-                        })),
-                        right: Box::new(Expr::Literal(Literal {
-                            value: "3".to_string(),
-                            primitive: Primitive::Int
-                        }))
+                        left: Box::new(Expr::Literal {
+                            literal: Literal {
+                                value: "2".to_string(),
+                                primitive: Primitive::Int
+                            },
+                            span: Span::default()
+                        }),
+                        right: Box::new(Expr::Literal {
+                            literal: Literal {
+                                value: "3".to_string(),
+                                primitive: Primitive::Int
+                            },
+                            span: Span::default()
+                        }),
+                        span: Span::default()
                     }),
-                }
+                    span: Span::default()
+                },
+                span: Span::default()
             }]
         );
     }
@@ -329,7 +416,7 @@ mod tests {
     fn test_unary_sign_operator() {
         let ast = parse("int res = -b * +3;").unwrap();
         assert_eq!(
-            ast,
+            ignore_spans_ast(ast),
             [Stmt::Declare {
                 dtype: Primitive::Int,
                 name: "res".to_string(),
@@ -337,13 +424,22 @@ mod tests {
                     op: BinOpKind::Mult,
                     left: Box::new(Expr::UnaryOp {
                         op: UnaryOpKind::Neg,
-                        expr: Box::new(Expr::Identifier("b".to_string()))
+                        expr: Box::new(Expr::Identifier {
+                            name: "b".to_string(),
+                            span: Span::default()
+                        }),
+                        span: Span::default()
                     }),
-                    right: Box::new(Expr::Literal(Literal {
-                        value: "3".to_string(),
-                        primitive: Primitive::Int
-                    })),
-                }
+                    right: Box::new(Expr::Literal {
+                        literal: Literal {
+                            value: "3".to_string(),
+                            primitive: Primitive::Int
+                        },
+                        span: Span::default()
+                    }),
+                    span: Span::default()
+                },
+                span: Span::default()
             }]
         );
     }
@@ -352,7 +448,7 @@ mod tests {
     fn test_simple_parentheses() {
         let ast = parse("int c = (1 + 2) * 3;").unwrap();
         assert_eq!(
-            ast,
+            ignore_spans_ast(ast),
             [Stmt::Declare {
                 dtype: Primitive::Int,
                 name: "c".to_string(),
@@ -360,20 +456,32 @@ mod tests {
                     op: BinOpKind::Mult,
                     left: Box::new(Expr::BinOp {
                         op: BinOpKind::Add,
-                        left: Box::new(Expr::Literal(Literal {
-                            value: "1".to_string(),
-                            primitive: Primitive::Int
-                        })),
-                        right: Box::new(Expr::Literal(Literal {
-                            value: "2".to_string(),
-                            primitive: Primitive::Int
-                        })),
+                        left: Box::new(Expr::Literal {
+                            literal: Literal {
+                                value: "1".to_string(),
+                                primitive: Primitive::Int
+                            },
+                            span: Span::default()
+                        }),
+                        right: Box::new(Expr::Literal {
+                            literal: Literal {
+                                value: "2".to_string(),
+                                primitive: Primitive::Int
+                            },
+                            span: Span::default()
+                        }),
+                        span: Span::default()
                     }),
-                    right: Box::new(Expr::Literal(Literal {
-                        value: "3".to_string(),
-                        primitive: Primitive::Int
-                    })),
-                }
+                    right: Box::new(Expr::Literal {
+                        literal: Literal {
+                            value: "3".to_string(),
+                            primitive: Primitive::Int
+                        },
+                        span: Span::default()
+                    }),
+                    span: Span::default()
+                },
+                span: Span::default()
             }]
         );
     }
@@ -382,7 +490,7 @@ mod tests {
     fn test_nested_parentheses() {
         let ast = parse("float c = ((1 + a) * b) / (a - b);").unwrap();
         assert_eq!(
-            ast,
+            ignore_spans_ast(ast),
             [Stmt::Declare {
                 dtype: Primitive::Float,
                 name: "c".to_string(),
@@ -392,20 +500,40 @@ mod tests {
                         op: BinOpKind::Mult,
                         left: Box::new(Expr::BinOp {
                             op: BinOpKind::Add,
-                            left: Box::new(Expr::Literal(Literal {
-                                value: "1".to_string(),
-                                primitive: Primitive::Int
-                            })),
-                            right: Box::new(Expr::Identifier("a".to_string())),
+                            left: Box::new(Expr::Literal {
+                                literal: Literal {
+                                    value: "1".to_string(),
+                                    primitive: Primitive::Int
+                                },
+                                span: Span::default()
+                            }),
+                            right: Box::new(Expr::Identifier {
+                                name: "a".to_string(),
+                                span: Span::default()
+                            }),
+                            span: Span::default()
                         }),
-                        right: Box::new(Expr::Identifier("b".to_string())),
+                        right: Box::new(Expr::Identifier {
+                            name: "b".to_string(),
+                            span: Span::default()
+                        }),
+                        span: Span::default()
                     }),
                     right: Box::new(Expr::BinOp {
                         op: BinOpKind::Sub,
-                        left: Box::new(Expr::Identifier("a".to_string())),
-                        right: Box::new(Expr::Identifier("b".to_string())),
+                        left: Box::new(Expr::Identifier {
+                            name: "a".to_string(),
+                            span: Span::default()
+                        }),
+                        right: Box::new(Expr::Identifier {
+                            name: "b".to_string(),
+                            span: Span::default()
+                        }),
+                        span: Span::default()
                     }),
-                }
+                    span: Span::default()
+                },
+                span: Span::default()
             }]
         );
     }
@@ -414,16 +542,24 @@ mod tests {
     fn test_print_statement() {
         let ast = parse("print(1 * b);").unwrap();
         assert_eq!(
-            ast,
+            ignore_spans_ast(ast),
             [Stmt::Print {
                 expr: Expr::BinOp {
                     op: BinOpKind::Mult,
-                    left: Box::new(Expr::Literal(Literal {
-                        value: "1".to_string(),
-                        primitive: Primitive::Int
-                    })),
-                    right: Box::new(Expr::Identifier("b".to_string()))
-                }
+                    left: Box::new(Expr::Literal {
+                        literal: Literal {
+                            value: "1".to_string(),
+                            primitive: Primitive::Int
+                        },
+                        span: Span::default()
+                    }),
+                    right: Box::new(Expr::Identifier {
+                        name: "b".to_string(),
+                        span: Span::default()
+                    }),
+                    span: Span::default()
+                },
+                span: Span::default()
             }]
         );
     }
@@ -432,20 +568,32 @@ mod tests {
     fn test_print_statement_with_parentheses() {
         let ast = parse("print((1 - b) * c);").unwrap();
         assert_eq!(
-            ast,
+            ignore_spans_ast(ast),
             [Stmt::Print {
                 expr: Expr::BinOp {
                     op: BinOpKind::Mult,
                     left: Box::new(Expr::BinOp {
                         op: BinOpKind::Sub,
-                        left: Box::new(Expr::Literal(Literal {
-                            value: "1".to_string(),
-                            primitive: Primitive::Int
-                        })),
-                        right: Box::new(Expr::Identifier("b".to_string()))
+                        left: Box::new(Expr::Literal {
+                            literal: Literal {
+                                value: "1".to_string(),
+                                primitive: Primitive::Int
+                            },
+                            span: Span::default()
+                        }),
+                        right: Box::new(Expr::Identifier {
+                            name: "b".to_string(),
+                            span: Span::default()
+                        }),
+                        span: Span::default()
                     }),
-                    right: Box::new(Expr::Identifier("c".to_string()))
-                }
+                    right: Box::new(Expr::Identifier {
+                        name: "c".to_string(),
+                        span: Span::default()
+                    }),
+                    span: Span::default()
+                },
+                span: Span::default()
             }]
         );
     }
@@ -454,25 +602,37 @@ mod tests {
     fn test_boolean_statement() {
         let ast = parse("bool a = true || (b >= 4);").unwrap();
         assert_eq!(
-            ast,
+            ignore_spans_ast(ast),
             [Stmt::Declare {
                 dtype: Primitive::Bool,
                 name: "a".to_string(),
                 expr: Expr::BinOp {
                     op: BinOpKind::Or,
-                    left: Box::new(Expr::Literal(Literal {
-                        value: "true".to_string(),
-                        primitive: Primitive::Bool
-                    })),
+                    left: Box::new(Expr::Literal {
+                        literal: Literal {
+                            value: "true".to_string(),
+                            primitive: Primitive::Bool
+                        },
+                        span: Span::default()
+                    }),
                     right: Box::new(Expr::BinOp {
                         op: BinOpKind::Ge,
-                        left: Box::new(Expr::Identifier("b".to_string())),
-                        right: Box::new(Expr::Literal(Literal {
-                            value: "4".to_string(),
-                            primitive: Primitive::Int
-                        })),
-                    })
-                }
+                        left: Box::new(Expr::Identifier {
+                            name: "b".to_string(),
+                            span: Span::default()
+                        }),
+                        right: Box::new(Expr::Literal {
+                            literal: Literal {
+                                value: "4".to_string(),
+                                primitive: Primitive::Int
+                            },
+                            span: Span::default()
+                        }),
+                        span: Span::default()
+                    }),
+                    span: Span::default()
+                },
+                span: Span::default()
             }]
         );
     }
@@ -481,7 +641,7 @@ mod tests {
     fn test_logical_not_unary_operation() {
         let ast = parse("bool a = !(true && !b);").unwrap();
         assert_eq!(
-            ast,
+            ignore_spans_ast(ast),
             [Stmt::Declare {
                 dtype: Primitive::Bool,
                 name: "a".to_string(),
@@ -489,16 +649,26 @@ mod tests {
                     op: UnaryOpKind::Not,
                     expr: Box::new(Expr::BinOp {
                         op: BinOpKind::And,
-                        left: Box::new(Expr::Literal(Literal {
-                            value: "true".to_string(),
-                            primitive: Primitive::Bool
-                        })),
+                        left: Box::new(Expr::Literal {
+                            literal: Literal {
+                                value: "true".to_string(),
+                                primitive: Primitive::Bool
+                            },
+                            span: Span::default()
+                        }),
                         right: Box::new(Expr::UnaryOp {
                             op: UnaryOpKind::Not,
-                            expr: Box::new(Expr::Identifier("b".to_string()))
-                        })
-                    })
-                }
+                            expr: Box::new(Expr::Identifier {
+                                name: "b".to_string(),
+                                span: Span::default()
+                            }),
+                            span: Span::default()
+                        }),
+                        span: Span::default()
+                    }),
+                    span: Span::default()
+                },
+                span: Span::default()
             }]
         );
     }
@@ -507,37 +677,61 @@ mod tests {
     fn test_boolean_precedence() {
         let ast = parse("bool a = true || b >= 4 && c == d != e;").unwrap();
         assert_eq!(
-            ast,
+            ignore_spans_ast(ast),
             [Stmt::Declare {
                 dtype: Primitive::Bool,
                 name: "a".to_string(),
                 expr: Expr::BinOp {
                     op: BinOpKind::Or,
-                    left: Box::new(Expr::Literal(Literal {
-                        value: "true".to_string(),
-                        primitive: Primitive::Bool
-                    })),
+                    left: Box::new(Expr::Literal {
+                        literal: Literal {
+                            value: "true".to_string(),
+                            primitive: Primitive::Bool
+                        },
+                        span: Span::default()
+                    }),
                     right: Box::new(Expr::BinOp {
                         op: BinOpKind::And,
                         left: Box::new(Expr::BinOp {
                             op: BinOpKind::Ge,
-                            left: Box::new(Expr::Identifier("b".to_string())),
-                            right: Box::new(Expr::Literal(Literal {
-                                value: "4".to_string(),
-                                primitive: Primitive::Int
-                            })),
+                            left: Box::new(Expr::Identifier {
+                                name: "b".to_string(),
+                                span: Span::default()
+                            }),
+                            right: Box::new(Expr::Literal {
+                                literal: Literal {
+                                    value: "4".to_string(),
+                                    primitive: Primitive::Int
+                                },
+                                span: Span::default()
+                            }),
+                            span: Span::default()
                         }),
                         right: Box::new(Expr::BinOp {
                             op: BinOpKind::Ne,
                             left: Box::new(Expr::BinOp {
                                 op: BinOpKind::Eq,
-                                left: Box::new(Expr::Identifier("c".to_string())),
-                                right: Box::new(Expr::Identifier("d".to_string())),
+                                left: Box::new(Expr::Identifier {
+                                    name: "c".to_string(),
+                                    span: Span::default()
+                                }),
+                                right: Box::new(Expr::Identifier {
+                                    name: "d".to_string(),
+                                    span: Span::default()
+                                }),
+                                span: Span::default()
                             }),
-                            right: Box::new(Expr::Identifier("e".to_string())),
-                        })
-                    })
-                }
+                            right: Box::new(Expr::Identifier {
+                                name: "e".to_string(),
+                                span: Span::default()
+                            }),
+                            span: Span::default()
+                        }),
+                        span: Span::default()
+                    }),
+                    span: Span::default()
+                },
+                span: Span::default()
             }]
         );
     }
@@ -546,37 +740,61 @@ mod tests {
     fn test_bool_expr_without_whitespaces() {
         let ast = parse("bool a=true||b>=4&&c==d!=e;").unwrap();
         assert_eq!(
-            ast,
+            ignore_spans_ast(ast),
             [Stmt::Declare {
                 dtype: Primitive::Bool,
                 name: "a".to_string(),
                 expr: Expr::BinOp {
                     op: BinOpKind::Or,
-                    left: Box::new(Expr::Literal(Literal {
-                        value: "true".to_string(),
-                        primitive: Primitive::Bool
-                    })),
+                    left: Box::new(Expr::Literal {
+                        literal: Literal {
+                            value: "true".to_string(),
+                            primitive: Primitive::Bool
+                        },
+                        span: Span::default()
+                    }),
                     right: Box::new(Expr::BinOp {
                         op: BinOpKind::And,
                         left: Box::new(Expr::BinOp {
                             op: BinOpKind::Ge,
-                            left: Box::new(Expr::Identifier("b".to_string())),
-                            right: Box::new(Expr::Literal(Literal {
-                                value: "4".to_string(),
-                                primitive: Primitive::Int
-                            })),
+                            left: Box::new(Expr::Identifier {
+                                name: "b".to_string(),
+                                span: Span::default()
+                            }),
+                            right: Box::new(Expr::Literal {
+                                literal: Literal {
+                                    value: "4".to_string(),
+                                    primitive: Primitive::Int
+                                },
+                                span: Span::default()
+                            }),
+                            span: Span::default()
                         }),
                         right: Box::new(Expr::BinOp {
                             op: BinOpKind::Ne,
                             left: Box::new(Expr::BinOp {
                                 op: BinOpKind::Eq,
-                                left: Box::new(Expr::Identifier("c".to_string())),
-                                right: Box::new(Expr::Identifier("d".to_string())),
+                                left: Box::new(Expr::Identifier {
+                                    name: "c".to_string(),
+                                    span: Span::default()
+                                }),
+                                right: Box::new(Expr::Identifier {
+                                    name: "d".to_string(),
+                                    span: Span::default()
+                                }),
+                                span: Span::default()
                             }),
-                            right: Box::new(Expr::Identifier("e".to_string())),
-                        })
-                    })
-                }
+                            right: Box::new(Expr::Identifier {
+                                name: "e".to_string(),
+                                span: Span::default()
+                            }),
+                            span: Span::default()
+                        }),
+                        span: Span::default()
+                    }),
+                    span: Span::default()
+                },
+                span: Span::default()
             }]
         );
     }
@@ -585,7 +803,7 @@ mod tests {
     fn test_arithm_expr_without_whitespaces() {
         let ast = parse("float c=((1+a)*b)/(a-b);").unwrap();
         assert_eq!(
-            ast,
+            ignore_spans_ast(ast),
             [Stmt::Declare {
                 dtype: Primitive::Float,
                 name: "c".to_string(),
@@ -595,20 +813,40 @@ mod tests {
                         op: BinOpKind::Mult,
                         left: Box::new(Expr::BinOp {
                             op: BinOpKind::Add,
-                            left: Box::new(Expr::Literal(Literal {
-                                value: "1".to_string(),
-                                primitive: Primitive::Int
-                            })),
-                            right: Box::new(Expr::Identifier("a".to_string())),
+                            left: Box::new(Expr::Literal {
+                                literal: Literal {
+                                    value: "1".to_string(),
+                                    primitive: Primitive::Int
+                                },
+                                span: Span::default()
+                            }),
+                            right: Box::new(Expr::Identifier {
+                                name: "a".to_string(),
+                                span: Span::default()
+                            }),
+                            span: Span::default()
                         }),
-                        right: Box::new(Expr::Identifier("b".to_string())),
+                        right: Box::new(Expr::Identifier {
+                            name: "b".to_string(),
+                            span: Span::default()
+                        }),
+                        span: Span::default()
                     }),
                     right: Box::new(Expr::BinOp {
                         op: BinOpKind::Sub,
-                        left: Box::new(Expr::Identifier("a".to_string())),
-                        right: Box::new(Expr::Identifier("b".to_string())),
+                        left: Box::new(Expr::Identifier {
+                            name: "a".to_string(),
+                            span: Span::default()
+                        }),
+                        right: Box::new(Expr::Identifier {
+                            name: "b".to_string(),
+                            span: Span::default()
+                        }),
+                        span: Span::default()
                     }),
-                }
+                    span: Span::default()
+                },
+                span: Span::default()
             }]
         );
     }

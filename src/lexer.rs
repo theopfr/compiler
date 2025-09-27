@@ -48,44 +48,37 @@ impl Lexer {
         match token.as_str() {
             "int" => self.tokens.push(Token {
                 kind: TokenKind::Declare(Primitive::Int),
-                line: start_line,
-                col: start_col,
+                span: Span { line: start_line, col: start_col },
             }),
             "float" => self.tokens.push(Token {
                 kind: TokenKind::Declare(Primitive::Float),
-                line: start_line,
-                col: start_col,
+                span: Span { line: start_line, col: start_col },
             }),
             "bool" => self.tokens.push(Token {
                 kind: TokenKind::Declare(Primitive::Bool),
-                line: start_line,
-                col: start_col,
+                span: Span { line: start_line, col: start_col },
             }),
             "print" => self.tokens.push(Token {
                 kind: TokenKind::Print,
-                line: start_line,
-                col: start_col,
+                span: Span { line: start_line, col: start_col },
             }),
             "true" => self.tokens.push(Token {
                 kind: TokenKind::Literal(Literal {
                     value: "true".to_string(),
                     primitive: Primitive::Bool,
                 }),
-                line: start_line,
-                col: start_col,
+                span: Span { line: start_line, col: start_col },
             }),
             "false" => self.tokens.push(Token {
                 kind: TokenKind::Literal(Literal {
                     value: "false".to_string(),
                     primitive: Primitive::Bool,
                 }),
-                line: start_line,
-                col: start_col,
+                span: Span { line: start_line, col: start_col },
             }),
             _ => self.tokens.push(Token {
                 kind: TokenKind::Identifier(token),
-                line: start_line,
-                col: start_col,
+                span: Span { line: start_line, col: start_col },
             }),
         }
     }
@@ -115,73 +108,66 @@ impl Lexer {
                     primitive: Primitive::Int,
                 }
             }),
-            line: start_line,
-            col: start_col,
+            span: Span { line: start_line, col: start_col },
         });
     }
 
     fn handle_boolean(&mut self) -> Result<(), CompilerError> {
+        let (start_line, start_col) = (self.cur_line, self.cur_col);
+
         let token = self.consume_next();
         match token {
             '=' => match self.peek_next() {
                 '=' => {
                     self.tokens.push(Token {
                         kind: TokenKind::BinOp(BinOpKind::Eq),
-                        line: self.cur_line,
-                        col: self.cur_col,
+                        span: Span { line: start_line, col: start_col },
                     });
                     self.consume_next();
                 }
                 _ => self.tokens.push(Token {
                     kind: TokenKind::BinOp(BinOpKind::Assign),
-                    line: self.cur_line,
-                    col: self.cur_col,
+                    span: Span { line: start_line, col: start_col },
                 }),
             },
             '<' => match self.peek_next() {
                 '=' => {
                     self.tokens.push(Token {
                         kind: TokenKind::BinOp(BinOpKind::Le),
-                        line: self.cur_line,
-                        col: self.cur_col,
+                        span: Span { line: start_line, col: start_col },
                     });
                     self.consume_next();
                 }
                 _ => self.tokens.push(Token {
                     kind: TokenKind::BinOp(BinOpKind::Lt),
-                    line: self.cur_line,
-                    col: self.cur_col,
+                    span: Span { line: start_line, col: start_col },
                 }),
             },
             '>' => match self.peek_next() {
                 '=' => {
                     self.tokens.push(Token {
                         kind: TokenKind::BinOp(BinOpKind::Ge),
-                        line: self.cur_line,
-                        col: self.cur_col,
+                        span: Span { line: start_line, col: start_col },
                     });
                     self.consume_next();
                 }
                 _ => self.tokens.push(Token {
                     kind: TokenKind::BinOp(BinOpKind::Gt),
-                    line: self.cur_line,
-                    col: self.cur_col,
+                    span: Span { line: start_line, col: start_col },
                 }),
             },
             '&' => match self.peek_next() {
                 '&' => {
                     self.tokens.push(Token {
                         kind: TokenKind::BinOp(BinOpKind::And),
-                        line: self.cur_line,
-                        col: self.cur_col,
+                        span: Span { line: start_line, col: start_col },
                     });
                     self.consume_next();
                 }
                 _ => {
                     return Err(CompilerError::SyntaxError {
                         message: "Unexpected single character '&', did you mean '&&'?".to_string(),
-                        line: self.cur_line,
-                        col: self.cur_col,
+                        span: Span { line: start_line, col: start_col },
                     });
                 }
             },
@@ -189,16 +175,14 @@ impl Lexer {
                 '|' => {
                     self.tokens.push(Token {
                         kind: TokenKind::BinOp(BinOpKind::Or),
-                        line: self.cur_line,
-                        col: self.cur_col,
+                        span: Span { line: start_line, col: start_col },
                     });
                     self.consume_next();
                 }
                 _ => {
                     return Err(CompilerError::SyntaxError {
                         message: "Unexpected single character '|', did you mean '||'?".to_string(),
-                        line: self.cur_line,
-                        col: self.cur_col,
+                        span: Span { line: start_line, col: start_col },
                     });
                 }
             },
@@ -207,23 +191,20 @@ impl Lexer {
                     '=' => {
                         self.tokens.push(Token {
                             kind: TokenKind::BinOp(BinOpKind::Ne),
-                            line: self.cur_line,
-                            col: self.cur_col,
+                            span: Span { line: start_line, col: start_col },
                         });
                         self.consume_next();
                     }
                     _ => self.tokens.push(Token {
                         kind: TokenKind::BinOp(BinOpKind::Not),
-                        line: self.cur_line,
-                        col: self.cur_col,
+                        span: Span { line: start_line, col: start_col },
                     }),
                 };
             }
             t => {
                 return Err(CompilerError::SyntaxError {
                     message: format!("Unexpected character '{}'.", t),
-                    line: self.cur_line,
-                    col: self.cur_col,
+                    span: Span { line: start_line, col: start_col },
                 });
             }
         }
@@ -253,44 +234,37 @@ impl Lexer {
                 }
                 '+' => self.tokens.push(Token {
                     kind: TokenKind::BinOp(BinOpKind::Add),
-                    line: self.cur_line,
-                    col: self.cur_col,
+                    span: Span { line: self.cur_line, col: self.cur_col },
                 }),
                 '-' => self.tokens.push(Token {
                     kind: TokenKind::BinOp(BinOpKind::Sub),
-                    line: self.cur_line,
-                    col: self.cur_col,
+                    span: Span { line: self.cur_line, col: self.cur_col },
                 }),
                 '*' => self.tokens.push(Token {
                     kind: TokenKind::BinOp(BinOpKind::Mult),
-                    line: self.cur_line,
-                    col: self.cur_col,
+                    span: Span { line: self.cur_line, col: self.cur_col },
                 }),
                 '/' => self.tokens.push(Token {
                     kind: TokenKind::BinOp(BinOpKind::Div),
-                    line: self.cur_line,
-                    col: self.cur_col,
+                    span: Span { line: self.cur_line, col: self.cur_col },
                 }),
                 '(' => self.tokens.push(Token {
                     kind: TokenKind::LParen,
-                    line: self.cur_line,
-                    col: self.cur_col,
+                    span: Span { line: self.cur_line, col: self.cur_col },
                 }),
                 ')' => self.tokens.push(Token {
                     kind: TokenKind::RParen,
-                    line: self.cur_line,
-                    col: self.cur_col,
+                    span: Span { line: self.cur_line, col: self.cur_col },
                 }),
                 ';' => self.tokens.push(Token {
                     kind: TokenKind::EOS,
-                    line: self.cur_line,
-                    col: self.cur_col,
+                    span: Span { line: self.cur_line, col: self.cur_col },
                 }),
                 '\0' => {
                     self.tokens.push(Token {
                         kind: TokenKind::EOF,
-                        line: self.cur_line,
-                        col: self.cur_col,
+                        span: Span { line: self.cur_line, col: self.cur_col },
+
                     });
                     self.consume_next();
                     break;
@@ -298,8 +272,7 @@ impl Lexer {
                 _ => {
                     return Err(CompilerError::SyntaxError {
                         message: format!("Unexpected character '{}'.", cur_char),
-                        line: self.cur_line,
-                        col: self.cur_col,
+                        span: Span { line: self.cur_line, col: self.cur_col },
                     });
                 }
             }
@@ -322,6 +295,12 @@ mod tests {
         let mut lexer = Lexer::new(&(input.to_owned() + "\0"));
         lexer.tokenize()?;
         Ok(lexer.get_tokens().iter().map(|t| t.kind.clone()).collect())
+    }
+
+    fn get_token_spans(input: &str) -> Result<Vec<Span>, CompilerError> {
+        let mut lexer = Lexer::new(&(input.to_owned() + "\0"));
+        lexer.tokenize()?;
+        Ok(lexer.get_tokens().iter().map(|t| t.span.clone()).collect())
     }
 
     #[test]
@@ -578,5 +557,85 @@ mod tests {
     fn test_invalid_character() {
         let result = tokenize("int a = 5 $ 2;");
         assert!(matches!(result, Err(CompilerError::SyntaxError { .. })));
+    }
+
+    #[test]
+    fn test_span_positions() {
+        let spans = get_token_spans("int a = 5 - 0.2;\nbool b = !(a >= 17);").unwrap();
+        assert_eq!(
+            spans,
+            vec![
+                Span { line: 1, col: 1 },    // int
+                Span { line: 1, col: 5 },    // a
+                Span { line: 1, col: 7 },    // =
+                Span { line: 1, col: 9 },    // 5
+                Span { line: 1, col: 11 },   // -
+                Span { line: 1, col: 13 },   // 0.2
+                Span { line: 1, col: 16 },   // ;
+                Span { line: 2, col: 1 },    // bool
+                Span { line: 2, col: 6 },    // b
+                Span { line: 2, col: 8 },    // =
+                Span { line: 2, col: 10 },   // !
+                Span { line: 2, col: 11 },   // (
+                Span { line: 2, col: 12 },   // a
+                Span { line: 2, col: 14 },   // >=
+                Span { line: 2, col: 17 },   // 17
+                Span { line: 2, col: 19 },   // )
+                Span { line: 2, col: 20 },   // ;
+                Span { line: 2, col: 21 },   // EOF
+            ]
+        );
+    }
+
+    #[test]
+    fn test_span_positions_no_whitespaces() {
+        let spans = get_token_spans("int a=5-0.2;\nbool b=!(a>=17);").unwrap();
+        assert_eq!(
+            spans,
+            vec![
+                Span { line: 1, col: 1 },   // int
+                Span { line: 1, col: 5 },   // a
+                Span { line: 1, col: 6 },   // =
+                Span { line: 1, col: 7 },   // 5
+                Span { line: 1, col: 8 },   // -
+                Span { line: 1, col: 9 },   // 0.2
+                Span { line: 1, col: 12 },  // ;
+                Span { line: 2, col: 1 },   // bool
+                Span { line: 2, col: 6 },   // b
+                Span { line: 2, col: 7 },   // =
+                Span { line: 2, col: 8 },   // !
+                Span { line: 2, col: 9 },   // (
+                Span { line: 2, col: 10 },  // a
+                Span { line: 2, col: 11 },  // >=
+                Span { line: 2, col: 13 },  // 17
+                Span { line: 2, col: 15 },  // )
+                Span { line: 2, col: 16 },  // ;
+                Span { line: 2, col: 17 },  // EOF
+            ]
+        );
+    }
+
+    #[test]
+    fn test_span_multi_line() {
+        let spans = get_token_spans("int a = -5 +\n 7;\n\nbool \nb = false;").unwrap();
+        assert_eq!(
+            spans,
+            vec![
+                Span { line: 1, col: 1 },   // int
+                Span { line: 1, col: 5 },   // a
+                Span { line: 1, col: 7 },   // =
+                Span { line: 1, col: 9 },   // -
+                Span { line: 1, col: 10 },  // 5
+                Span { line: 1, col: 12 },  // +
+                Span { line: 2, col: 2 },   // 7
+                Span { line: 2, col: 3 },   // ;
+                Span { line: 4, col: 1 },   // bool
+                Span { line: 5, col: 1 },   // b
+                Span { line: 5, col: 3 },   // =
+                Span { line: 5, col: 5 },   // false
+                Span { line: 5, col: 10 },  // ;
+                Span { line: 5, col: 11 },  // EOF
+            ]
+        );
     }
 }

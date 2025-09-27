@@ -15,15 +15,15 @@ fn main() {
 
 fn compile() -> Result<(), CompilerError> {
     let code = 
-"bool a = (1 * (2 + 3)) + 3;
+"int a = (1 * (2 + 3)) + 3;
 float b = -a / 5;
 print(b + 3);
 float c = 0.00001;
-float d = a + c;
+int d = 10 / 10;
 float e = a;
 bool b1 = 2 == 2;
 bool b2 = !(true && (2 > 0.5)) || (d != e) && (10 <= 200);
-print(true && b2);\0";
+print(true && false);\0";
 
     /*let code = 
 "bool b = true && false;

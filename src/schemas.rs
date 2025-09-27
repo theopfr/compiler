@@ -12,10 +12,22 @@ pub struct Identifier {
 }
 
 
+#[derive(PartialEq, Clone, Debug)]
+pub struct Span {
+    pub line: usize,
+    pub col: usize
+}
+
+impl Default for Span {
+    fn default() -> Self {
+        Span { line: 0, col: 0 }
+    }
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub struct Literal {
     pub value: String,
-    pub primitive: Primitive
+    pub primitive: Primitive,
 }
 
 // lexer schemas
@@ -35,8 +47,7 @@ pub enum TokenKind {
 #[derive(Clone, Debug)]
 pub struct Token {
     pub kind: TokenKind,
-    pub line: usize,
-    pub col: usize,
+    pub span: Span
 }
 
 
@@ -67,23 +78,31 @@ pub enum UnaryOpKind {
 
 #[derive(PartialEq, Clone, Debug)]
 pub enum Expr {
-    Literal(Literal),
-    Identifier(String),
+    Literal {
+        literal: Literal,
+        span: Span
+    },
+    Identifier {
+        name: String,
+        span: Span
+    },
     BinOp {
         op: BinOpKind,
         left: Box<Expr>,
         right: Box<Expr>,
+        span: Span
     },
     UnaryOp {
         op: UnaryOpKind,
-        expr: Box<Expr>
+        expr: Box<Expr>,
+        span: Span
     }
 }
 
 #[derive(PartialEq, Clone, Debug)]
 pub enum Stmt {
-    Declare { dtype: Primitive, name: String, expr: Expr },
-    Print { expr: Expr },
+    Declare { dtype: Primitive, name: String, expr: Expr, span: Span },
+    Print { expr: Expr, span: Span },
 }
 
 

@@ -1,6 +1,6 @@
 use crate::{
     errors::CompilerError,
-    schemas::{Ast, BinOpKind, Expr, Identifier, Primitive, Stmt, UnaryOpKind},
+    schemas::{Ast, BinOpKind, Expr, Identifier, Primitive, Span, Stmt, UnaryOpKind},
 };
 use std::collections::HashMap;
 
@@ -21,6 +21,7 @@ impl SemanticAnalyser {
         op: &BinOpKind,
         left_type: &Primitive,
         right_type: &Primitive,
+        span: &Span
     ) -> Result<Primitive, CompilerError> {
         match (op, left_type, right_type) {
             // Addition, subtraction and multiplication return int for int operands.
@@ -69,8 +70,7 @@ impl SemanticAnalyser {
                     _ => Err(CompilerError::TypeDeclarationError {
                         expected: left_type.clone(),
                         found: right_type.clone(),
-                        line: 0,
-                        col: 0,
+                        span: span.clone(),
                     }),
                 }
             }
@@ -78,8 +78,7 @@ impl SemanticAnalyser {
                 op: op.clone(),
                 left: left_type.clone(),
                 right: right_type.clone(),
-                line: 0,
-                col: 0,
+                span: span.clone(),
             }),
         }
     }
@@ -87,6 +86,7 @@ impl SemanticAnalyser {
     fn infer_unaryop_type(
         op: &UnaryOpKind,
         operand_type: &Primitive,
+        span: &Span
     ) -> Result<Primitive, CompilerError> {
         match (op, operand_type) {
             // Unary negation (-) only valid on int or float
@@ -98,8 +98,7 @@ impl SemanticAnalyser {
             _ => Err(CompilerError::TypeUnaryOpError {
                 op: op.clone(),
                 operand: operand_type.clone(),
-                line: 0,
-                col: 0,
+                span: span.clone(),
             }),
         }
     }
@@ -109,29 +108,28 @@ impl SemanticAnalyser {
         symbol_table: &HashMap<String, Identifier>,
     ) -> Result<Primitive, CompilerError> {
         match expr {
-            Expr::Literal(literal) => {
+            Expr::Literal { literal, span: _ } => {
                 return Ok(literal.primitive.clone());
             }
-            Expr::Identifier(ident_name) => match symbol_table.get(ident_name) {
+            Expr::Identifier { name, span } => match symbol_table.get(name) {
                 Some(identifier) => return Ok(identifier.primitive.clone()),
                 None => Err(CompilerError::NameError {
-                    name: ident_name.to_string(),
-                    line: 0,
-                    col: 0,
+                    name: name.to_string(),
+                    span: span.clone(),
                 }),
             },
-            Expr::BinOp { op, left, right } => {
+            Expr::BinOp { op, left, right, span } => {
                 let left_type = Self::check_expr(left, symbol_table)?;
                 let right_type = Self::check_expr(right, symbol_table)?;
 
-                match Self::infer_binop_type(&op, &left_type, &right_type) {
+                match Self::infer_binop_type(&op, &left_type, &right_type, &span) {
                     Ok(infered_type) => Ok(infered_type),
                     Err(err) => Err(err),
                 }
             }
-            Expr::UnaryOp { op, expr } => {
+            Expr::UnaryOp { op, expr, span } => {
                 let expr = Self::check_expr(expr, symbol_table)?;
-                match Self::infer_unaryop_type(&op, &expr) {
+                match Self::infer_unaryop_type(&op, &expr, &span) {
                     Ok(infered_type) => Ok(infered_type),
                     Err(err) => Err(err),
                 }
@@ -144,7 +142,7 @@ impl SemanticAnalyser {
         symbol_table: &mut HashMap<String, Identifier>,
     ) -> Result<(), CompilerError> {
         match stmt {
-            Stmt::Declare { dtype, name, expr } => {
+            Stmt::Declare { dtype, name, expr, span } => {
                 symbol_table.insert(
                     name.to_string(),
                     Identifier {
@@ -152,12 +150,12 @@ impl SemanticAnalyser {
                     },
                 );
                 let expr_type = Self::check_expr(expr, symbol_table)?;
-                match Self::infer_binop_type(&BinOpKind::Assign, dtype, &expr_type) {
+                match Self::infer_binop_type(&BinOpKind::Assign, dtype, &expr_type, span) {
                     Ok(_) => Ok(()),
                     Err(err) => return Err(err),
                 }
             }
-            Stmt::Print { expr } => {
+            Stmt::Print { expr, span: _ } => {
                 Self::check_expr(expr, symbol_table)?;
                 Ok(())
             }
