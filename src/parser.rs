@@ -46,7 +46,7 @@ impl Parser {
             TokenKind::BinOp(BinOpKind::Sub) => Expr::UnaryOp {
                 op: UnaryOpKind::Neg,
                 expr: Box::new(self.parse_expression(INFINITY)?),
-                span: cur_token.span
+                span: cur_token.span,
             },
 
             // Handle unary '-' sign.
@@ -56,7 +56,7 @@ impl Parser {
             TokenKind::BinOp(BinOpKind::Not) => Expr::UnaryOp {
                 op: UnaryOpKind::Not,
                 expr: Box::new(self.parse_expression(INFINITY)?),
-                span: cur_token.span
+                span: cur_token.span,
             },
 
             // Handle expression in parentheses.
@@ -86,7 +86,7 @@ impl Parser {
 
             match &next_op_token.kind {
                 TokenKind::BinOp(op) => {
-                    let (lbp, rbp) = Self::airthmetic_binding_power(&op);
+                    let (lbp, rbp) = Self::airthmetic_binding_power(&op, &next_op_token.span)?;
                     if lbp < min_binding_pow {
                         break;
                     }
@@ -98,12 +98,12 @@ impl Parser {
                         op: op_clone,
                         left: Box::new(lhs),
                         right: Box::new(self.parse_expression(rbp.clone())?),
-                        span: next_op_token.span
+                        span: next_op_token.span,
                     };
                 }
+                TokenKind::RParen => break,
                 TokenKind::EOS => break,
                 TokenKind::EOF => break,
-                TokenKind::RParen => break,
                 t => {
                     return Err(CompilerError::SyntaxError {
                         message: format!("Unexpected token {:?}.", t),
@@ -116,16 +116,18 @@ impl Parser {
         Ok(lhs)
     }
 
-    fn airthmetic_binding_power(op: &BinOpKind) -> (f32, f32) {
-        match op {
-            BinOpKind::Mult | BinOpKind::Div => (6.1, 6.2),
-            BinOpKind::Add | BinOpKind::Sub => (5.1, 5.2),
-            BinOpKind::Gt | BinOpKind::Lt | BinOpKind::Ge | BinOpKind::Le => (4.1, 4.2),
-            BinOpKind::Eq | BinOpKind::Ne => (3.1, 3.2),
-            BinOpKind::And => (2.1, 2.2),
-            BinOpKind::Or => (1.1, 1.2),
-            BinOpKind::Not => panic!("Unary!"),
-            BinOpKind::Assign => panic!("Assign!"),
+    fn airthmetic_binding_power(binop_kind: &BinOpKind, span: &Span) -> Result<(f32, f32), CompilerError> {
+        match binop_kind {
+            BinOpKind::Mult | BinOpKind::Div => Ok((6.1, 6.2)),
+            BinOpKind::Add | BinOpKind::Sub => Ok((5.1, 5.2)),
+            BinOpKind::Gt | BinOpKind::Lt | BinOpKind::Ge | BinOpKind::Le => Ok((4.1, 4.2)),
+            BinOpKind::Eq | BinOpKind::Ne => Ok((3.1, 3.2)),
+            BinOpKind::And => Ok((2.1, 2.2)),
+            BinOpKind::Or => Ok((1.1, 1.2)),
+            t => Err(CompilerError::SyntaxError {
+                message: format!("Unexpected token {:?}.", t),
+                span: span.clone(),
+            }),
         }
     }
 
@@ -212,17 +214,23 @@ impl Parser {
             let stmt = self.parse_statement()?;
 
             let next_token = self.peek_next();
-            if !matches!(next_token.kind, TokenKind::EOS) {
-                return Err(CompilerError::SyntaxError {
-                    message: "Expected ';' at end of expression.".to_string(),
-                    span: next_token.span,
-                });
-            }
-
-            self.tree.push(stmt);
-
-            if matches!(next_token.kind, TokenKind::EOS) {
-                self.consume_next();
+            match next_token.kind {
+                TokenKind::EOS => {
+                    self.consume_next();
+                    self.tree.push(stmt);
+                }
+                TokenKind::RParen => {
+                    return Err(CompilerError::SyntaxError {
+                        message: "Unmatched ')'.".to_string(),
+                        span: next_token.span,
+                    });
+                }
+                _ => {
+                    return Err(CompilerError::SyntaxError {
+                        message: "Expected ';' at end of expression.".to_string(),
+                        span: next_token.span,
+                    });
+                }
             }
         }
 
@@ -264,7 +272,12 @@ mod tests {
                 expr: Box::new(ignore_spans_expr(*expr)),
                 span: Span::default(),
             },
-            Expr::BinOp { op, left, right, span: _ } => Expr::BinOp {
+            Expr::BinOp {
+                op,
+                left,
+                right,
+                span: _,
+            } => Expr::BinOp {
                 op,
                 left: Box::new(ignore_spans_expr(*left)),
                 right: Box::new(ignore_spans_expr(*right)),
@@ -854,12 +867,72 @@ mod tests {
     #[test]
     fn test_missing_eos_semicolon() {
         let result = parse("int a = 0 print(a);");
-        assert!(matches!(result, Err(CompilerError::SyntaxError { .. })));
+        assert!(matches!(
+            result,
+            Err(CompilerError::SyntaxError { span, .. }) if span.line == 1 && span.col == 11
+        ));
     }
 
     #[test]
     fn test_missing_closing_parenthese() {
         let result = parse("int a = ((5 + 4) / 4;");
-        assert!(matches!(result, Err(CompilerError::SyntaxError { .. })));
+        assert!(matches!(
+            result,
+            Err(CompilerError::SyntaxError { span, .. }) if span.line == 1 && span.col == 21
+        ));
+    }
+
+    #[test]
+    fn test_unmatched_closing_parenthese() {
+        let result = parse("int a = 3;\nfloat b = a + 4) / 4;");
+        assert!(matches!(
+            result,
+            Err(CompilerError::SyntaxError { span, .. }) if span.line == 2 && span.col == 16
+        ));
+    }
+
+    #[test]
+    fn test_missing_assign_operator_after_declaration() {
+        let result = parse("int a = 3;\nfloat b a = 2;");
+        assert!(matches!(
+            result,
+            Err(CompilerError::SyntaxError { span, .. }) if span.line == 2 && span.col == 9
+        ));
+    }
+
+    #[test]
+    fn test_missing_parentheses_after_print() {
+        let result = parse("print a + 2;");
+        assert!(matches!(
+            result,
+            Err(CompilerError::SyntaxError { span, .. }) if span.line == 1 && span.col == 7
+        ));
+    }
+
+    #[test]
+    fn test_unknown_statement_start_token() {
+        let result = parse("let a = 2;"); // keyword 'let' doesn't exist
+        assert!(matches!(
+            result,
+            Err(CompilerError::SyntaxError { span, .. }) if span.line == 1 && span.col == 1
+        ));
+    }
+
+    #[test]
+    fn test_missing_identifier_initialisation() {
+        let result = parse("int = 2;"); // keyword 'let' doesn't exist
+        assert!(matches!(
+            result,
+            Err(CompilerError::SyntaxError { span, .. }) if span.line == 1 && span.col == 5
+        ));
+    }
+
+    #[test]
+    fn test_wrong_greater_than_token() {
+        let result = parse("int a = 5;\nbool b = (a => 6);"); // typo, should be '=>' but is "assign + greater-than"
+        assert!(matches!(
+            result,
+            Err(CompilerError::SyntaxError { span, .. }) if span.line == 2 && span.col == 13
+        ));
     }
 }

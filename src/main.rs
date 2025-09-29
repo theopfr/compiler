@@ -14,7 +14,7 @@ fn main() {
 }
 
 fn compile() -> Result<(), CompilerError> {
-    let code = 
+    /*let code = 
 "int a = (1 * (2 + 3)) + 3;
 float b = -a / 5;
 print(b + 3);
@@ -23,17 +23,14 @@ int d = 10 / 10;
 float e = a;
 bool b1 = 2 == 2;
 bool b2 = !(true && (2 > 0.5)) || (d != e) && (10 <= 200);
-print(true && false);\0";
+print(true && false);\0";*/
 
-    /*let code = 
-"bool b = true && false;
-int a = 2\0"
-    ;*/
+    let code = "int a = 5;\nbool b = (a => 6);\0";
 
     let mut lexer = Lexer::new(code);
     lexer.tokenize()?;
     let tokens = lexer.get_tokens();
-
+    println!("{:#?}", tokens);
     let mut parser = Parser::new(tokens.to_vec());
     parser.parse()?;
     let ast = parser.get_tree();
@@ -42,7 +39,7 @@ int a = 2\0"
     analyser.check()?;
 
     println!("{:#?}", parser.get_tree());
-    //println!("{:#?}", analyser.get_symbol_table());
+    println!("{:#?}", analyser.get_symbol_table());
 
     Ok(())
 }
