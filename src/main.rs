@@ -25,7 +25,7 @@ bool b1 = 2 == 2;
 bool b2 = !(true && (2 > 0.5)) || (d != e) && (10 <= 200);
 print(true && false);\0";*/
 
-    let code = "int a = 5;\nbool b = (a => 6);\0";
+    let code = "int a = 5;\nbool b = (a == 6);\0";
 
     let mut lexer = Lexer::new(code);
     lexer.tokenize()?;

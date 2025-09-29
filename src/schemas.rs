@@ -8,7 +8,8 @@ pub enum Primitive {
 
 #[derive(Debug)]
 pub struct Identifier {
-    pub primitive: Primitive
+    pub primitive: Primitive,
+    pub span: Span
 }
 
 
@@ -79,7 +80,8 @@ pub enum UnaryOpKind {
 #[derive(PartialEq, Clone, Debug)]
 pub enum Expr {
     Literal {
-        literal: Literal,
+        value: String,
+        primitive: Primitive,
         span: Span
     },
     Identifier {

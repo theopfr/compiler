@@ -108,8 +108,8 @@ impl SemanticAnalyser {
         symbol_table: &HashMap<String, Identifier>,
     ) -> Result<Primitive, CompilerError> {
         match expr {
-            Expr::Literal { literal, span: _ } => {
-                return Ok(literal.primitive.clone());
+            Expr::Literal { primitive, .. } => {
+                return Ok(primitive.clone());
             }
             Expr::Identifier { name, span } => match symbol_table.get(name) {
                 Some(identifier) => return Ok(identifier.primitive.clone()),
@@ -147,6 +147,7 @@ impl SemanticAnalyser {
                     name.to_string(),
                     Identifier {
                         primitive: dtype.clone(),
+                        span: span.clone()
                     },
                 );
                 let expr_type = Self::check_expr(expr, symbol_table)?;

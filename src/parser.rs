@@ -34,7 +34,8 @@ impl Parser {
         let cur_token = self.consume_next();
         let mut lhs = match cur_token.kind {
             TokenKind::Literal(literal) => Expr::Literal {
-                literal: literal.clone(),
+                value: literal.value,
+                primitive: literal.primitive,
                 span: cur_token.span,
             },
             TokenKind::Identifier(name) => Expr::Identifier {
@@ -259,8 +260,9 @@ mod tests {
 
     fn ignore_spans_expr(expr: Expr) -> Expr {
         match expr {
-            Expr::Literal { literal, .. } => Expr::Literal {
-                literal,
+            Expr::Literal { value, primitive, .. } => Expr::Literal {
+                value,
+                primitive,
                 span: Span::default(),
             },
             Expr::Identifier { name, .. } => Expr::Identifier {
@@ -321,17 +323,13 @@ mod tests {
                 expr: Expr::BinOp {
                     op: BinOpKind::Add,
                     left: Box::new(Expr::Literal {
-                        literal: Literal {
-                            value: "1".to_string(),
-                            primitive: Primitive::Int
-                        },
+                        value: "1".to_string(),
+                        primitive: Primitive::Int,
                         span: Span::default()
                     }),
                     right: Box::new(Expr::Literal {
-                        literal: Literal {
-                            value: "2".to_string(),
-                            primitive: Primitive::Int
-                        },
+                        value: "2".to_string(),
+                        primitive: Primitive::Int,
                         span: Span::default()
                     }),
                     span: Span::default()
@@ -354,26 +352,20 @@ mod tests {
                     left: Box::new(Expr::BinOp {
                         op: BinOpKind::Mult,
                         left: Box::new(Expr::Literal {
-                            literal: Literal {
-                                value: "1".to_string(),
-                                primitive: Primitive::Int
-                            },
+                            value: "1".to_string(),
+                            primitive: Primitive::Int,
                             span: Span::default()
                         }),
                         right: Box::new(Expr::Literal {
-                            literal: Literal {
-                                value: "2".to_string(),
-                                primitive: Primitive::Int
-                            },
+                            value: "2".to_string(),
+                            primitive: Primitive::Int,
                             span: Span::default()
                         }),
                         span: Span::default()
                     }),
                     right: Box::new(Expr::Literal {
-                        literal: Literal {
-                            value: "3.5".to_string(),
-                            primitive: Primitive::Float
-                        },
+                        value: "3.5".to_string(),
+                        primitive: Primitive::Float,
                         span: Span::default()
                     }),
                     span: Span::default()
@@ -394,26 +386,20 @@ mod tests {
                 expr: Expr::BinOp {
                     op: BinOpKind::Sub,
                     left: Box::new(Expr::Literal {
-                        literal: Literal {
-                            value: "0.3333".to_string(),
-                            primitive: Primitive::Float
-                        },
+                        value: "0.3333".to_string(),
+                        primitive: Primitive::Float,
                         span: Span::default()
                     }),
                     right: Box::new(Expr::BinOp {
                         op: BinOpKind::Div,
                         left: Box::new(Expr::Literal {
-                            literal: Literal {
-                                value: "2".to_string(),
-                                primitive: Primitive::Int
-                            },
+                            value: "2".to_string(),
+                            primitive: Primitive::Int,
                             span: Span::default()
                         }),
                         right: Box::new(Expr::Literal {
-                            literal: Literal {
-                                value: "3".to_string(),
-                                primitive: Primitive::Int
-                            },
+                            value: "3".to_string(),
+                            primitive: Primitive::Int,
                             span: Span::default()
                         }),
                         span: Span::default()
@@ -444,10 +430,8 @@ mod tests {
                         span: Span::default()
                     }),
                     right: Box::new(Expr::Literal {
-                        literal: Literal {
-                            value: "3".to_string(),
-                            primitive: Primitive::Int
-                        },
+                        value: "3".to_string(),
+                        primitive: Primitive::Int,
                         span: Span::default()
                     }),
                     span: Span::default()
@@ -470,26 +454,20 @@ mod tests {
                     left: Box::new(Expr::BinOp {
                         op: BinOpKind::Add,
                         left: Box::new(Expr::Literal {
-                            literal: Literal {
-                                value: "1".to_string(),
-                                primitive: Primitive::Int
-                            },
+                            value: "1".to_string(),
+                            primitive: Primitive::Int,
                             span: Span::default()
                         }),
                         right: Box::new(Expr::Literal {
-                            literal: Literal {
-                                value: "2".to_string(),
-                                primitive: Primitive::Int
-                            },
+                            value: "2".to_string(),
+                            primitive: Primitive::Int,
                             span: Span::default()
                         }),
                         span: Span::default()
                     }),
                     right: Box::new(Expr::Literal {
-                        literal: Literal {
-                            value: "3".to_string(),
-                            primitive: Primitive::Int
-                        },
+                        value: "3".to_string(),
+                        primitive: Primitive::Int,
                         span: Span::default()
                     }),
                     span: Span::default()
@@ -514,10 +492,8 @@ mod tests {
                         left: Box::new(Expr::BinOp {
                             op: BinOpKind::Add,
                             left: Box::new(Expr::Literal {
-                                literal: Literal {
-                                    value: "1".to_string(),
-                                    primitive: Primitive::Int
-                                },
+                                value: "1".to_string(),
+                                primitive: Primitive::Int,
                                 span: Span::default()
                             }),
                             right: Box::new(Expr::Identifier {
@@ -560,10 +536,8 @@ mod tests {
                 expr: Expr::BinOp {
                     op: BinOpKind::Mult,
                     left: Box::new(Expr::Literal {
-                        literal: Literal {
-                            value: "1".to_string(),
-                            primitive: Primitive::Int
-                        },
+                        value: "1".to_string(),
+                        primitive: Primitive::Int,
                         span: Span::default()
                     }),
                     right: Box::new(Expr::Identifier {
@@ -588,10 +562,8 @@ mod tests {
                     left: Box::new(Expr::BinOp {
                         op: BinOpKind::Sub,
                         left: Box::new(Expr::Literal {
-                            literal: Literal {
-                                value: "1".to_string(),
-                                primitive: Primitive::Int
-                            },
+                            value: "1".to_string(),
+                            primitive: Primitive::Int,
                             span: Span::default()
                         }),
                         right: Box::new(Expr::Identifier {
@@ -622,10 +594,8 @@ mod tests {
                 expr: Expr::BinOp {
                     op: BinOpKind::Or,
                     left: Box::new(Expr::Literal {
-                        literal: Literal {
-                            value: "true".to_string(),
-                            primitive: Primitive::Bool
-                        },
+                        value: "true".to_string(),
+                        primitive: Primitive::Bool,
                         span: Span::default()
                     }),
                     right: Box::new(Expr::BinOp {
@@ -635,10 +605,8 @@ mod tests {
                             span: Span::default()
                         }),
                         right: Box::new(Expr::Literal {
-                            literal: Literal {
-                                value: "4".to_string(),
-                                primitive: Primitive::Int
-                            },
+                            value: "4".to_string(),
+                            primitive: Primitive::Int,
                             span: Span::default()
                         }),
                         span: Span::default()
@@ -663,10 +631,8 @@ mod tests {
                     expr: Box::new(Expr::BinOp {
                         op: BinOpKind::And,
                         left: Box::new(Expr::Literal {
-                            literal: Literal {
-                                value: "true".to_string(),
-                                primitive: Primitive::Bool
-                            },
+                            value: "true".to_string(),
+                            primitive: Primitive::Bool,
                             span: Span::default()
                         }),
                         right: Box::new(Expr::UnaryOp {
@@ -697,10 +663,8 @@ mod tests {
                 expr: Expr::BinOp {
                     op: BinOpKind::Or,
                     left: Box::new(Expr::Literal {
-                        literal: Literal {
-                            value: "true".to_string(),
-                            primitive: Primitive::Bool
-                        },
+                        value: "true".to_string(),
+                        primitive: Primitive::Bool,
                         span: Span::default()
                     }),
                     right: Box::new(Expr::BinOp {
@@ -712,10 +676,8 @@ mod tests {
                                 span: Span::default()
                             }),
                             right: Box::new(Expr::Literal {
-                                literal: Literal {
-                                    value: "4".to_string(),
-                                    primitive: Primitive::Int
-                                },
+                                value: "4".to_string(),
+                                primitive: Primitive::Int,
                                 span: Span::default()
                             }),
                             span: Span::default()
@@ -760,10 +722,8 @@ mod tests {
                 expr: Expr::BinOp {
                     op: BinOpKind::Or,
                     left: Box::new(Expr::Literal {
-                        literal: Literal {
-                            value: "true".to_string(),
-                            primitive: Primitive::Bool
-                        },
+                        value: "true".to_string(),
+                        primitive: Primitive::Bool,
                         span: Span::default()
                     }),
                     right: Box::new(Expr::BinOp {
@@ -775,10 +735,8 @@ mod tests {
                                 span: Span::default()
                             }),
                             right: Box::new(Expr::Literal {
-                                literal: Literal {
-                                    value: "4".to_string(),
-                                    primitive: Primitive::Int
-                                },
+                                value: "4".to_string(),
+                                primitive: Primitive::Int,
                                 span: Span::default()
                             }),
                             span: Span::default()
@@ -827,10 +785,8 @@ mod tests {
                         left: Box::new(Expr::BinOp {
                             op: BinOpKind::Add,
                             left: Box::new(Expr::Literal {
-                                literal: Literal {
-                                    value: "1".to_string(),
-                                    primitive: Primitive::Int
-                                },
+                                value: "1".to_string(),
+                                primitive: Primitive::Int,
                                 span: Span::default()
                             }),
                             right: Box::new(Expr::Identifier {
