@@ -25,20 +25,21 @@ bool b1 = 2 == 2;
 bool b2 = !(true && (2 > 0.5)) || (d != e) && (10 <= 200);
 print(true && false);\0";*/
 
-    let code = "int a = 5;\nbool b = (a == 6);\0";
+    let code = 
+"let a = 2;\0";
 
     let mut lexer = Lexer::new(code);
     lexer.tokenize()?;
     let tokens = lexer.get_tokens();
-    println!("{:#?}", tokens);
+    //println!("{:#?}", tokens);
+
     let mut parser = Parser::new(tokens.to_vec());
     parser.parse()?;
     let ast = parser.get_tree();
+    println!("{:#?}", parser.get_tree());
 
     let mut analyser = SemanticAnalyser::new(ast.to_vec());
     analyser.check()?;
-
-    println!("{:#?}", parser.get_tree());
     println!("{:#?}", analyser.get_symbol_table());
 
     Ok(())

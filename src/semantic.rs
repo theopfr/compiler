@@ -21,7 +21,7 @@ impl SemanticAnalyser {
         op: &BinOpKind,
         left_type: &Primitive,
         right_type: &Primitive,
-        span: &Span
+        span: &Span,
     ) -> Result<Primitive, CompilerError> {
         match (op, left_type, right_type) {
             // Addition, subtraction and multiplication return int for int operands.
@@ -86,7 +86,7 @@ impl SemanticAnalyser {
     fn infer_unaryop_type(
         op: &UnaryOpKind,
         operand_type: &Primitive,
-        span: &Span
+        span: &Span,
     ) -> Result<Primitive, CompilerError> {
         match (op, operand_type) {
             // Unary negation (-) only valid on int or float
@@ -118,7 +118,12 @@ impl SemanticAnalyser {
                     span: span.clone(),
                 }),
             },
-            Expr::BinOp { op, left, right, span } => {
+            Expr::BinOp {
+                op,
+                left,
+                right,
+                span,
+            } => {
                 let left_type = Self::check_expr(left, symbol_table)?;
                 let right_type = Self::check_expr(right, symbol_table)?;
 
@@ -142,12 +147,19 @@ impl SemanticAnalyser {
         symbol_table: &mut HashMap<String, Identifier>,
     ) -> Result<(), CompilerError> {
         match stmt {
-            Stmt::Declare { dtype, name, expr, span } => {
+            Stmt::Declare {
+                dtype,
+                name,
+                expr,
+                span,
+                mutable,
+            } => {
                 symbol_table.insert(
                     name.to_string(),
                     Identifier {
                         primitive: dtype.clone(),
-                        span: span.clone()
+                        span: span.clone(),
+                        mutable: *mutable,
                     },
                 );
                 let expr_type = Self::check_expr(expr, symbol_table)?;
@@ -156,6 +168,28 @@ impl SemanticAnalyser {
                     Err(err) => return Err(err),
                 }
             }
+            Stmt::MutAssign { name, expr, span } => {
+                let symbol = match symbol_table.get(name) {
+                    Some(identifier) => identifier,
+                    None => return Err(CompilerError::NameError {
+                        name: name.to_string(),
+                        span: span.clone(),
+                    }),
+                };
+
+                if !symbol.mutable {
+                    return Err(CompilerError::MutabilityError {
+                        name: name.to_string(),
+                        span: span.clone(),
+                    })
+                }
+
+                let expr_type = Self::check_expr(expr, symbol_table)?;
+                match Self::infer_binop_type(&BinOpKind::Assign, &symbol.primitive, &expr_type, span) {
+                    Ok(_) => Ok(()),
+                    Err(err) => return Err(err),
+                }
+            },
             Stmt::Print { expr, span: _ } => {
                 Self::check_expr(expr, symbol_table)?;
                 Ok(())
@@ -233,39 +267,82 @@ mod tests {
     #[test]
     fn test_assigning_bool_to_int_and_float_var() {
         let result = check("int a = 200 == 200;\0");
-        assert!(matches!(result, Err(CompilerError::TypeDeclarationError { .. })));
+        assert!(matches!(
+            result,
+            Err(CompilerError::TypeDeclarationError { .. })
+        ));
 
         let result = check("float b = !false;\0");
-        assert!(matches!(result, Err(CompilerError::TypeDeclarationError { .. })));
+        assert!(matches!(
+            result,
+            Err(CompilerError::TypeDeclarationError { .. })
+        ));
     }
 
     #[test]
     fn test_assigning_int_and_float_to_bool_var() {
         let result = check("bool b = 200 - 200;\0");
-        assert!(matches!(result, Err(CompilerError::TypeDeclarationError { .. })));
+        assert!(matches!(
+            result,
+            Err(CompilerError::TypeDeclarationError { .. })
+        ));
 
         let result = check("bool b = 0.02;\0");
-        assert!(matches!(result, Err(CompilerError::TypeDeclarationError { .. })));
+        assert!(matches!(
+            result,
+            Err(CompilerError::TypeDeclarationError { .. })
+        ));
     }
 
     #[test]
     fn test_numeric_comparison_binop() {
-        check("
+        check(
+            "
             bool a = 0.5 > -200;
             bool b = !(10 == 11);
             bool c = 10 <= 11;
             bool d = 10 != 11;
             \0
-        ").unwrap();
+        ",
+        )
+        .unwrap();
     }
 
     #[test]
     fn test_boolean_comparison_binop() {
-        check("
+        check(
+            "
             bool a = true == true;
             bool b = true != false;
             \0
-        ").unwrap();
+        ",
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn test_mutable_reassign() {
+        check(
+            "
+            mut int a = 1;
+            int b = 2;
+            a = (5 * b) / 3;
+            \0
+        ",
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn test_immutable_reassign_() {
+        let result = check(
+            "
+            int a = 1;
+            a = 2;
+            \0
+        ",
+        );
+        assert!(matches!(result, Err(CompilerError::MutabilityError { .. })));
     }
 
     #[test]
@@ -294,7 +371,10 @@ mod tests {
         check("int a = -2 * +-+-+(-+-4.0);\0").unwrap();
 
         let result = check("bool a = -false;\0");
-        assert!(matches!(result, Err(CompilerError::TypeUnaryOpError { .. })));
+        assert!(matches!(
+            result,
+            Err(CompilerError::TypeUnaryOpError { .. })
+        ));
     }
 
     #[test]
@@ -302,6 +382,9 @@ mod tests {
         check("bool b = !true && !!(!!false);\0").unwrap();
 
         let result = check("int a = 200;int b = !a;\0");
-        assert!(matches!(result, Err(CompilerError::TypeUnaryOpError { .. })));
+        assert!(matches!(
+            result,
+            Err(CompilerError::TypeUnaryOpError { .. })
+        ));
     }
 }

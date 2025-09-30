@@ -117,7 +117,10 @@ impl Parser {
         Ok(lhs)
     }
 
-    fn airthmetic_binding_power(binop_kind: &BinOpKind, span: &Span) -> Result<(f32, f32), CompilerError> {
+    fn airthmetic_binding_power(
+        binop_kind: &BinOpKind,
+        span: &Span,
+    ) -> Result<(f32, f32), CompilerError> {
         match binop_kind {
             BinOpKind::Mult | BinOpKind::Div => Ok((6.1, 6.2)),
             BinOpKind::Add | BinOpKind::Sub => Ok((5.1, 5.2)),
@@ -132,43 +135,87 @@ impl Parser {
         }
     }
 
+    fn parse_declaration(
+        &mut self,
+        primitive: &Primitive,
+        span: Span,
+        mutable: bool,
+    ) -> Result<Stmt, CompilerError> {
+        let next_token = self.peek_next().clone();
+
+        // Check for identifier (ie. variable name)
+        let identifer_name = match next_token.kind {
+            TokenKind::Identifier(name) => name,
+            t => {
+                return Err(CompilerError::SyntaxError {
+                    message: format!("Unexpected token {:?}.", t),
+                    span: next_token.span,
+                });
+            }
+        };
+        self.consume_next();
+
+        let next_token = self.peek_next();
+
+        // Check for assign token (ie. '=')
+        if !matches!(next_token.kind, TokenKind::BinOp(BinOpKind::Assign)) {
+            return Err(CompilerError::SyntaxError {
+                message: "Expected '=' after declaration.".to_string(),
+                span: next_token.span,
+            });
+        }
+        self.consume_next();
+
+        Ok(Stmt::Declare {
+            dtype: primitive.clone(),
+            name: identifer_name.clone(),
+            expr: self.parse_expression(0.0)?,
+            span: span.clone(),
+            mutable,
+        })
+    }
+
     fn parse_statement(&mut self) -> Result<Stmt, CompilerError> {
         let cur_token = self.consume_next().clone();
         match cur_token.kind {
             TokenKind::Declare(ref primitive) => {
+                self.parse_declaration(primitive, cur_token.span, false)
+            }
+            TokenKind::Mut => {
                 let next_token = self.peek_next().clone();
 
-                // Check for identifier (ie. variable name)
-                let identifer_name = match next_token.kind {
-                    TokenKind::Identifier(name) => name,
+                // Check for declaration
+                let declared_primitive = match next_token.kind {
+                    TokenKind::Declare(ref primitive) => primitive,
                     t => {
                         return Err(CompilerError::SyntaxError {
-                            message: format!("Unexpected token {:?}.", t),
+                            message: format!(
+                                "UExpected variable declaration after 'mut'. Found token '{:?}' instead.",
+                                t
+                            ),
                             span: next_token.span,
                         });
                     }
                 };
                 self.consume_next();
-
+                self.parse_declaration(declared_primitive, cur_token.span, true)
+            }
+            TokenKind::Identifier(name) => {
                 let next_token = self.peek_next();
 
                 // Check for assign token (ie. '=')
                 if !matches!(next_token.kind, TokenKind::BinOp(BinOpKind::Assign)) {
                     return Err(CompilerError::SyntaxError {
-                        message: "Expected '=' after declaration.".to_string(),
+                        message: format!("Invalid syntax. Did you mean to put '=' after variable '{name}'?"),
                         span: next_token.span,
                     });
                 }
                 self.consume_next();
 
-                Ok(Stmt::Declare {
-                    dtype: primitive.clone(),
-                    name: identifer_name.clone(),
+                Ok(Stmt::MutAssign {
+                    name: name,
                     expr: self.parse_expression(0.0)?,
-                    span: Span {
-                        line: cur_token.span.line,
-                        col: cur_token.span.col,
-                    },
+                    span: cur_token.span,
                 })
             }
             TokenKind::Print => {
@@ -260,7 +307,9 @@ mod tests {
 
     fn ignore_spans_expr(expr: Expr) -> Expr {
         match expr {
-            Expr::Literal { value, primitive, .. } => Expr::Literal {
+            Expr::Literal {
+                value, primitive, ..
+            } => Expr::Literal {
                 value,
                 primitive,
                 span: Span::default(),
@@ -293,15 +342,26 @@ mod tests {
             Stmt::Declare {
                 dtype,
                 name,
+                mutable,
                 expr,
                 span: _,
             } => Stmt::Declare {
                 dtype,
                 name,
+                mutable,
                 expr: ignore_spans_expr(expr),
                 span: Span::default(),
             },
             Stmt::Print { expr, span: _ } => Stmt::Print {
+                expr: ignore_spans_expr(expr),
+                span: Span::default(),
+            },
+            Stmt::MutAssign {
+                name,
+                expr,
+                span: _,
+            } => Stmt::MutAssign {
+                name,
                 expr: ignore_spans_expr(expr),
                 span: Span::default(),
             },
@@ -334,7 +394,8 @@ mod tests {
                     }),
                     span: Span::default()
                 },
-                span: Span::default()
+                span: Span::default(),
+                mutable: false
             }]
         );
     }
@@ -370,7 +431,8 @@ mod tests {
                     }),
                     span: Span::default()
                 },
-                span: Span::default()
+                span: Span::default(),
+                mutable: false
             }]
         );
     }
@@ -406,7 +468,8 @@ mod tests {
                     }),
                     span: Span::default()
                 },
-                span: Span::default()
+                span: Span::default(),
+                mutable: false
             }]
         );
     }
@@ -436,7 +499,8 @@ mod tests {
                     }),
                     span: Span::default()
                 },
-                span: Span::default()
+                span: Span::default(),
+                mutable: false
             }]
         );
     }
@@ -472,7 +536,8 @@ mod tests {
                     }),
                     span: Span::default()
                 },
-                span: Span::default()
+                span: Span::default(),
+                mutable: false
             }]
         );
     }
@@ -522,7 +587,8 @@ mod tests {
                     }),
                     span: Span::default()
                 },
-                span: Span::default()
+                span: Span::default(),
+                mutable: false
             }]
         );
     }
@@ -613,7 +679,8 @@ mod tests {
                     }),
                     span: Span::default()
                 },
-                span: Span::default()
+                span: Span::default(),
+                mutable: false
             }]
         );
     }
@@ -647,7 +714,8 @@ mod tests {
                     }),
                     span: Span::default()
                 },
-                span: Span::default()
+                span: Span::default(),
+                mutable: false
             }]
         );
     }
@@ -706,7 +774,8 @@ mod tests {
                     }),
                     span: Span::default()
                 },
-                span: Span::default()
+                span: Span::default(),
+                mutable: false
             }]
         );
     }
@@ -765,7 +834,8 @@ mod tests {
                     }),
                     span: Span::default()
                 },
-                span: Span::default()
+                span: Span::default(),
+                mutable: false
             }]
         );
     }
@@ -815,9 +885,55 @@ mod tests {
                     }),
                     span: Span::default()
                 },
+                span: Span::default(),
+                mutable: false
+            }]
+        );
+    }
+
+    #[test]
+    fn test_mut_declare_statement() {
+        let ast = parse("mut int a = 1;").unwrap();
+        assert_eq!(
+            ignore_spans_ast(ast),
+            [Stmt::Declare {
+                dtype: Primitive::Int,
+                name: "a".to_string(),
+                mutable: true,
+                expr: Expr::Literal {
+                    value: "1".to_string(),
+                    primitive: Primitive::Int,
+                    span: Span::default()
+                },
+                span: Span::default(),
+            }]
+        );
+    }
+
+    #[test]
+    fn test_mut_assign_statement() {
+        let ast = parse("a = 1;").unwrap();
+        assert_eq!(
+            ignore_spans_ast(ast),
+            [Stmt::MutAssign {
+                name: "a".to_string(),
+                expr: Expr::Literal {
+                    value: "1".to_string(),
+                    primitive: Primitive::Int,
+                    span: Span::default()
+                },
                 span: Span::default()
             }]
         );
+    }
+
+    #[test]
+    fn test_mut_assign_with_type_missing() {
+        let result = parse("mut a = 0;");
+        assert!(matches!(
+            result,
+            Err(CompilerError::SyntaxError { span, .. }) if span.line == 1 && span.col == 5
+        ));
     }
 
     #[test]
@@ -867,10 +983,10 @@ mod tests {
 
     #[test]
     fn test_unknown_statement_start_token() {
-        let result = parse("let a = 2;"); // keyword 'let' doesn't exist
+        let result = parse("let a = 2;"); // keyword 'let' doesn't exist, parser will think it's an identifier
         assert!(matches!(
             result,
-            Err(CompilerError::SyntaxError { span, .. }) if span.line == 1 && span.col == 1
+            Err(CompilerError::SyntaxError { span, .. }) if span.line == 1 && span.col == 5
         ));
     }
 

@@ -3,20 +3,20 @@
 pub enum Primitive {
     Int,
     Float,
-    Bool
+    Bool,
 }
 
 #[derive(Debug)]
 pub struct Identifier {
     pub primitive: Primitive,
-    pub span: Span
+    pub span: Span,
+    pub mutable: bool,
 }
-
 
 #[derive(PartialEq, Clone, Debug)]
 pub struct Span {
     pub line: usize,
-    pub col: usize
+    pub col: usize,
 }
 
 impl Default for Span {
@@ -38,6 +38,7 @@ pub enum TokenKind {
     Identifier(String),
     Literal(Literal),
     BinOp(BinOpKind),
+    Mut,
     LParen,
     RParen,
     Print,
@@ -48,9 +49,8 @@ pub enum TokenKind {
 #[derive(Clone, Debug)]
 pub struct Token {
     pub kind: TokenKind,
-    pub span: Span
+    pub span: Span,
 }
-
 
 // ast schemas
 #[derive(PartialEq, Clone, Debug)]
@@ -68,13 +68,13 @@ pub enum BinOpKind {
     Ne,
     And,
     Or,
-    Not
+    Not,
 }
 
 #[derive(PartialEq, Clone, Debug)]
 pub enum UnaryOpKind {
     Neg,
-    Not
+    Not,
 }
 
 #[derive(PartialEq, Clone, Debug)]
@@ -82,30 +82,43 @@ pub enum Expr {
     Literal {
         value: String,
         primitive: Primitive,
-        span: Span
+        span: Span,
     },
     Identifier {
         name: String,
-        span: Span
+        span: Span,
     },
     BinOp {
         op: BinOpKind,
         left: Box<Expr>,
         right: Box<Expr>,
-        span: Span
+        span: Span,
     },
     UnaryOp {
         op: UnaryOpKind,
         expr: Box<Expr>,
-        span: Span
-    }
+        span: Span,
+    },
 }
 
 #[derive(PartialEq, Clone, Debug)]
 pub enum Stmt {
-    Declare { dtype: Primitive, name: String, expr: Expr, span: Span },
-    Print { expr: Expr, span: Span },
+    Declare {
+        dtype: Primitive,
+        mutable: bool,
+        name: String,
+        expr: Expr,
+        span: Span,
+    },
+    MutAssign {
+        name: String,
+        expr: Expr,
+        span: Span,
+    },
+    Print {
+        expr: Expr,
+        span: Span,
+    },
 }
-
 
 pub type Ast = Vec<Stmt>;

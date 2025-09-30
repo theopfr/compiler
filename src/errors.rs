@@ -27,6 +27,10 @@ pub enum CompilerError {
         name: String,
         span: Span,
     },
+    MutabilityError {
+        name: String,
+        span: Span,
+    },
 }
 
 impl fmt::Display for CompilerError {
@@ -62,24 +66,24 @@ impl fmt::Display for CompilerError {
                     span.line, span.col, op, left, right
                 )
             }
-            CompilerError::TypeUnaryOpError {
-                op,
-                operand,
-                span,
-            } => {
+            CompilerError::TypeUnaryOpError { op, operand, span } => {
                 write!(
                     f,
                     "TypeError (line {}, position {}): Cannot apply unary operation '{:?}' to '{:?}''.",
                     span.line, span.col, op, operand
                 )
             }
-            CompilerError::NameError {
-                name,
-                span
-            } => {
+            CompilerError::NameError { name, span } => {
                 write!(
                     f,
                     "NameError (line {}, position {}): Cannot find identifier '{}'.",
+                    span.line, span.col, name
+                )
+            }
+            CompilerError::MutabilityError { name, span } => {
+                write!(
+                    f,
+                    "MutabilityError (line {}, position {}): Cannot assign twice to immutable variable '{}'.",
                     span.line, span.col, name
                 )
             },

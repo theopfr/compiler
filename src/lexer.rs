@@ -33,7 +33,7 @@ impl Lexer {
     }
 
     fn handle_alphanumeric(&mut self) {
-        let (start_line, start_col) = (self.cur_line, self.cur_col);
+        let cur_span = Span { line: self.cur_line, col: self.cur_col };
 
         let mut token: String = String::new();
         loop {
@@ -48,43 +48,47 @@ impl Lexer {
         match token.as_str() {
             "int" => self.tokens.push(Token {
                 kind: TokenKind::Declare(Primitive::Int),
-                span: Span { line: start_line, col: start_col },
+                span: cur_span,
             }),
             "float" => self.tokens.push(Token {
                 kind: TokenKind::Declare(Primitive::Float),
-                span: Span { line: start_line, col: start_col },
+                span: cur_span,
             }),
             "bool" => self.tokens.push(Token {
                 kind: TokenKind::Declare(Primitive::Bool),
-                span: Span { line: start_line, col: start_col },
+                span: cur_span,
+            }),
+            "mut" => self.tokens.push(Token {
+                kind: TokenKind::Mut,
+                span: cur_span,
             }),
             "print" => self.tokens.push(Token {
                 kind: TokenKind::Print,
-                span: Span { line: start_line, col: start_col },
+                span: cur_span,
             }),
             "true" => self.tokens.push(Token {
                 kind: TokenKind::Literal(Literal {
                     value: "true".to_string(),
                     primitive: Primitive::Bool,
                 }),
-                span: Span { line: start_line, col: start_col },
+                span: cur_span,
             }),
             "false" => self.tokens.push(Token {
                 kind: TokenKind::Literal(Literal {
                     value: "false".to_string(),
                     primitive: Primitive::Bool,
                 }),
-                span: Span { line: start_line, col: start_col },
+                span: cur_span,
             }),
             _ => self.tokens.push(Token {
                 kind: TokenKind::Identifier(token),
-                span: Span { line: start_line, col: start_col },
+                span: cur_span,
             }),
         }
     }
 
     fn handle_numeric(&mut self) {
-        let (start_line, start_col) = (self.cur_line, self.cur_col);
+        let cur_span = Span { line: self.cur_line, col: self.cur_col };
 
         let mut token = String::new();
         loop {
@@ -108,12 +112,12 @@ impl Lexer {
                     primitive: Primitive::Int,
                 }
             }),
-            span: Span { line: start_line, col: start_col },
+            span: cur_span,
         });
     }
 
     fn handle_boolean(&mut self) -> Result<(), CompilerError> {
-        let (start_line, start_col) = (self.cur_line, self.cur_col);
+        let cur_span = Span { line: self.cur_line, col: self.cur_col };
 
         let token = self.consume_next();
         match token {
@@ -121,53 +125,53 @@ impl Lexer {
                 '=' => {
                     self.tokens.push(Token {
                         kind: TokenKind::BinOp(BinOpKind::Eq),
-                        span: Span { line: start_line, col: start_col },
+                        span: cur_span,
                     });
                     self.consume_next();
                 }
                 _ => self.tokens.push(Token {
                     kind: TokenKind::BinOp(BinOpKind::Assign),
-                    span: Span { line: start_line, col: start_col },
+                    span: cur_span,
                 }),
             },
             '<' => match self.peek_next() {
                 '=' => {
                     self.tokens.push(Token {
                         kind: TokenKind::BinOp(BinOpKind::Le),
-                        span: Span { line: start_line, col: start_col },
+                        span: cur_span,
                     });
                     self.consume_next();
                 }
                 _ => self.tokens.push(Token {
                     kind: TokenKind::BinOp(BinOpKind::Lt),
-                    span: Span { line: start_line, col: start_col },
+                    span: cur_span,
                 }),
             },
             '>' => match self.peek_next() {
                 '=' => {
                     self.tokens.push(Token {
                         kind: TokenKind::BinOp(BinOpKind::Ge),
-                        span: Span { line: start_line, col: start_col },
+                        span: cur_span,
                     });
                     self.consume_next();
                 }
                 _ => self.tokens.push(Token {
                     kind: TokenKind::BinOp(BinOpKind::Gt),
-                    span: Span { line: start_line, col: start_col },
+                    span: cur_span,
                 }),
             },
             '&' => match self.peek_next() {
                 '&' => {
                     self.tokens.push(Token {
                         kind: TokenKind::BinOp(BinOpKind::And),
-                        span: Span { line: start_line, col: start_col },
+                        span: cur_span,
                     });
                     self.consume_next();
                 }
                 _ => {
                     return Err(CompilerError::SyntaxError {
                         message: "Unexpected single character '&', did you mean '&&'?".to_string(),
-                        span: Span { line: start_line, col: start_col },
+                        span: cur_span,
                     });
                 }
             },
@@ -175,14 +179,14 @@ impl Lexer {
                 '|' => {
                     self.tokens.push(Token {
                         kind: TokenKind::BinOp(BinOpKind::Or),
-                        span: Span { line: start_line, col: start_col },
+                        span: cur_span,
                     });
                     self.consume_next();
                 }
                 _ => {
                     return Err(CompilerError::SyntaxError {
                         message: "Unexpected single character '|', did you mean '||'?".to_string(),
-                        span: Span { line: start_line, col: start_col },
+                        span: cur_span,
                     });
                 }
             },
@@ -191,20 +195,20 @@ impl Lexer {
                     '=' => {
                         self.tokens.push(Token {
                             kind: TokenKind::BinOp(BinOpKind::Ne),
-                            span: Span { line: start_line, col: start_col },
+                            span: cur_span,
                         });
                         self.consume_next();
                     }
                     _ => self.tokens.push(Token {
                         kind: TokenKind::BinOp(BinOpKind::Not),
-                        span: Span { line: start_line, col: start_col },
+                        span: cur_span,
                     }),
                 };
             }
             t => {
                 return Err(CompilerError::SyntaxError {
                     message: format!("Unexpected character '{}'.", t),
-                    span: Span { line: start_line, col: start_col },
+                    span: cur_span,
                 });
             }
         }
@@ -545,6 +549,44 @@ mod tests {
                 TokenKind::BinOp(BinOpKind::Le),
                 TokenKind::Literal(Literal {
                     value: "4".to_string(),
+                    primitive: Primitive::Int
+                }),
+                TokenKind::EOS,
+                TokenKind::EOF,
+            ]
+        );
+    }
+
+    #[test]
+    fn test_mut_declaration() {
+        let tokens = tokenize("mut int a = 42;").unwrap();
+        assert_eq!(
+            tokens,
+            vec![
+                TokenKind::Mut,
+                TokenKind::Declare(Primitive::Int),
+                TokenKind::Identifier("a".into()),
+                TokenKind::BinOp(BinOpKind::Assign),
+                TokenKind::Literal(Literal {
+                    value: "42".to_string(),
+                    primitive: Primitive::Int
+                }),
+                TokenKind::EOS,
+                TokenKind::EOF,
+            ]
+        );
+    }
+
+    #[test]
+    fn test_mut_assign() {
+        let tokens = tokenize("a = 23;").unwrap();
+        assert_eq!(
+            tokens,
+            vec![
+                TokenKind::Identifier("a".into()),
+                TokenKind::BinOp(BinOpKind::Assign),
+                TokenKind::Literal(Literal {
+                    value: "23".to_string(),
                     primitive: Primitive::Int
                 }),
                 TokenKind::EOS,
