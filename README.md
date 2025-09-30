@@ -11,9 +11,9 @@
 - types: 'int', 'float' and 'bool'
 - immutable by default, mutability via the `mut` keyword, e.g `mut int a = 10; a = 5;`
 - Todos:
- - [ ] scopes
- - [ ] 'if' statements
- - [ ] 'while' loops
- - [ ] 'for' loops
- - [ ] functions
- - [ ] array primitive
+  - [ ] scopes
+  - [ ] 'if' statements
+  - [ ] 'while' loops
+  - [ ] 'for' loops
+  - [ ] functions
+  - [ ] array primitive
